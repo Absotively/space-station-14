@@ -477,14 +477,14 @@ namespace Content.Server.Database.Migrations.Postgres
                         .HasColumnType("text")
                         .HasColumnName("antag_name");
 
-                    b.Property<int>("ProfileId")
+                    b.Property<int>("PreferenceId")
                         .HasColumnType("integer")
-                        .HasColumnName("profile_id");
+                        .HasColumnName("preference_id");
 
                     b.HasKey("Id")
                         .HasName("PK_antag");
 
-                    b.HasIndex("ProfileId", "AntagName")
+                    b.HasIndex("PreferenceId", "AntagName")
                         .IsUnique();
 
                     b.ToTable("antag", (string)null);
@@ -677,23 +677,23 @@ namespace Content.Server.Database.Migrations.Postgres
                         .HasColumnType("text")
                         .HasColumnName("job_name");
 
+                    b.Property<int>("PreferenceId")
+                        .HasColumnType("integer")
+                        .HasColumnName("preference_id");
+
                     b.Property<int>("Priority")
                         .HasColumnType("integer")
                         .HasColumnName("priority");
 
-                    b.Property<int>("ProfileId")
-                        .HasColumnType("integer")
-                        .HasColumnName("profile_id");
-
                     b.HasKey("Id")
                         .HasName("PK_job");
 
-                    b.HasIndex("ProfileId");
+                    b.HasIndex("PreferenceId");
 
-                    b.HasIndex("ProfileId", "JobName")
+                    b.HasIndex("PreferenceId", "JobName")
                         .IsUnique();
 
-                    b.HasIndex(new[] { "ProfileId" }, "IX_job_one_high_priority")
+                    b.HasIndex(new[] { "PreferenceId" }, "IX_job_one_high_priority")
                         .IsUnique()
                         .HasFilter("priority = 3");
 
@@ -797,6 +797,10 @@ namespace Content.Server.Database.Migrations.Postgres
                         .HasColumnType("text")
                         .HasColumnName("admin_ooc_color");
 
+                    b.Property<int>("PreferenceUnavailable")
+                        .HasColumnType("integer")
+                        .HasColumnName("pref_unavailable");
+
                     b.Property<int>("SelectedCharacterSlot")
                         .HasColumnType("integer")
                         .HasColumnName("selected_character_slot");
@@ -874,10 +878,6 @@ namespace Content.Server.Database.Migrations.Postgres
                     b.Property<int>("PreferenceId")
                         .HasColumnType("integer")
                         .HasColumnName("preference_id");
-
-                    b.Property<int>("PreferenceUnavailable")
-                        .HasColumnType("integer")
-                        .HasColumnName("pref_unavailable");
 
                     b.Property<string>("Sex")
                         .IsRequired()
@@ -1641,14 +1641,14 @@ namespace Content.Server.Database.Migrations.Postgres
 
             modelBuilder.Entity("Content.Server.Database.Antag", b =>
                 {
-                    b.HasOne("Content.Server.Database.Profile", "Profile")
+                    b.HasOne("Content.Server.Database.Preference", "Preference")
                         .WithMany("Antags")
-                        .HasForeignKey("ProfileId")
+                        .HasForeignKey("PreferenceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("FK_antag_profile_profile_id");
+                        .HasConstraintName("FK_antag_preference_preference_id");
 
-                    b.Navigation("Profile");
+                    b.Navigation("Preference");
                 });
 
             modelBuilder.Entity("Content.Server.Database.ConnectionLog", b =>
@@ -1693,14 +1693,14 @@ namespace Content.Server.Database.Migrations.Postgres
 
             modelBuilder.Entity("Content.Server.Database.Job", b =>
                 {
-                    b.HasOne("Content.Server.Database.Profile", "Profile")
+                    b.HasOne("Content.Server.Database.Preference", "Preference")
                         .WithMany("Jobs")
-                        .HasForeignKey("ProfileId")
+                        .HasForeignKey("PreferenceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("FK_job_profile_profile_id");
+                        .HasConstraintName("FK_job_preference_preference_id");
 
-                    b.Navigation("Profile");
+                    b.Navigation("Preference");
                 });
 
             modelBuilder.Entity("Content.Server.Database.Player", b =>
@@ -2056,15 +2056,15 @@ namespace Content.Server.Database.Migrations.Postgres
 
             modelBuilder.Entity("Content.Server.Database.Preference", b =>
                 {
+                    b.Navigation("Antags");
+
+                    b.Navigation("Jobs");
+
                     b.Navigation("Profiles");
                 });
 
             modelBuilder.Entity("Content.Server.Database.Profile", b =>
                 {
-                    b.Navigation("Antags");
-
-                    b.Navigation("Jobs");
-
                     b.Navigation("Loadouts");
 
                     b.Navigation("Traits");

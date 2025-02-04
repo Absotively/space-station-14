@@ -1,0 +1,184 @@
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace Content.Server.Database.Migrations.Postgres
+{
+    /// <inheritdoc />
+    public partial class MoveRoleOptionsFromProfiles : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.AddColumn<int>(
+                name: "pref_unavailable",
+                table: "preference",
+                type: "integer",
+                nullable: false,
+                defaultValue: 0);
+
+            /* Keep pref_unavailable setting from each player's lowest-numbered slot */
+            migrationBuilder.Sql(@"
+UPDATE preference SET pref_unavailable = (
+  SELECT pref_unavailable
+    FROM profile
+    WHERE profile.preference_id = preference.preference_id
+    ORDER BY slot ASC
+    LIMIT 1
+);
+");
+
+            migrationBuilder.DropColumn(
+                name: "pref_unavailable",
+                table: "profile");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_job_profile_profile_id",
+                table: "job");
+
+            /* Combine each player's job preferences across all their profiles,
+             * treating High priority as Medium */
+            migrationBuilder.Sql(@"
+CREATE TEMP TABLE pref_job_temp
+AS SELECT preference_id, job_name, min(2, max(priority)) priority
+  FROM job
+    JOIN profile ON job.profile_id = profile.profile_id
+  GROUP BY preference_id, job_name;
+");
+
+            /* TODO: Keep each player's High priority from their lowest-slot-number profile
+             * that has a High priority. Maybe. Or don't because it would be complicated. */
+
+            migrationBuilder.Sql("DROP FROM job;");
+
+            migrationBuilder.RenameColumn(
+                name: "profile_id",
+                table: "job",
+                newName: "preference_id");
+
+            migrationBuilder.RenameIndex(
+                name: "IX_job_profile_id_job_name",
+                table: "job",
+                newName: "IX_job_preference_id_job_name");
+
+            migrationBuilder.RenameIndex(
+                name: "IX_job_profile_id",
+                table: "job",
+                newName: "IX_job_preference_id");
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_job_preference_preference_id",
+                table: "job",
+                column: "preference_id",
+                principalTable: "preference",
+                principalColumn: "preference_id",
+                onDelete: ReferentialAction.Cascade);
+
+            migrationBuilder.Sql(@"
+INSERT INTO job(preference_id, job_name, priority)
+SELECT preference_id, job_name, priority FROM pref_job_temp;
+");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_antag_profile_profile_id",
+                table: "antag");
+
+            /* Combine each player's antag preferences across all their profiles */
+            migrationBuilder.Sql(@"
+CREATE TEMP TABLE pref_antag_temp
+AS SELECT DISTINCT preference_id, antag_name
+  FROM job
+    JOIN profile ON job.profile_id = profile.profile_id;
+");
+
+            migrationBuilder.Sql("DROP FROM antag;");
+
+            migrationBuilder.RenameColumn(
+                name: "profile_id",
+                table: "antag",
+                newName: "preference_id");
+
+            migrationBuilder.RenameIndex(
+                name: "IX_antag_profile_id_antag_name",
+                table: "antag",
+                newName: "IX_antag_preference_id_antag_name");
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_antag_preference_preference_id",
+                table: "antag",
+                column: "preference_id",
+                principalTable: "preference",
+                principalColumn: "preference_id",
+                onDelete: ReferentialAction.Cascade);
+
+            migrationBuilder.Sql(@"
+INSERT INTO antag(preference_id, antag_name)
+SELECT preference_id, antag_name, priority FROM pref_antag_temp;
+");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropForeignKey(
+                name: "FK_antag_preference_preference_id",
+                table: "antag");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_job_preference_preference_id",
+                table: "job");
+
+            migrationBuilder.DropColumn(
+                name: "pref_unavailable",
+                table: "preference");
+
+            migrationBuilder.RenameColumn(
+                name: "preference_id",
+                table: "job",
+                newName: "profile_id");
+
+            migrationBuilder.RenameIndex(
+                name: "IX_job_preference_id_job_name",
+                table: "job",
+                newName: "IX_job_profile_id_job_name");
+
+            migrationBuilder.RenameIndex(
+                name: "IX_job_preference_id",
+                table: "job",
+                newName: "IX_job_profile_id");
+
+            migrationBuilder.RenameColumn(
+                name: "preference_id",
+                table: "antag",
+                newName: "profile_id");
+
+            migrationBuilder.RenameIndex(
+                name: "IX_antag_preference_id_antag_name",
+                table: "antag",
+                newName: "IX_antag_profile_id_antag_name");
+
+            migrationBuilder.AddColumn<int>(
+                name: "pref_unavailable",
+                table: "profile",
+                type: "integer",
+                nullable: false,
+                defaultValue: 0);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_antag_profile_profile_id",
+                table: "antag",
+                column: "profile_id",
+                principalTable: "profile",
+                principalColumn: "profile_id",
+                onDelete: ReferentialAction.Cascade);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_job_profile_profile_id",
+                table: "job",
+                column: "profile_id",
+                principalTable: "profile",
+                principalColumn: "profile_id",
+                onDelete: ReferentialAction.Cascade);
+        }
+    }
+}

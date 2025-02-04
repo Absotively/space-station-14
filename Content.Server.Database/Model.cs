@@ -58,7 +58,7 @@ namespace Content.Server.Database
                 .IsUnique();
 
             modelBuilder.Entity<Antag>()
-                .HasIndex(p => new {HumanoidProfileId = p.ProfileId, p.AntagName})
+                .HasIndex(p => new {p.PreferenceId, p.AntagName})
                 .IsUnique();
 
             modelBuilder.Entity<Trait>()
@@ -84,15 +84,15 @@ namespace Content.Server.Database
                 .IsRequired();
 
             modelBuilder.Entity<Job>()
-                .HasIndex(j => j.ProfileId);
+                .HasIndex(j => j.PreferenceId);
 
             modelBuilder.Entity<Job>()
-                .HasIndex(j => j.ProfileId, "IX_job_one_high_priority")
+                .HasIndex(j => j.PreferenceId, "IX_job_one_high_priority")
                 .IsUnique()
                 .HasFilter("priority = 3");
 
             modelBuilder.Entity<Job>()
-                .HasIndex(j => new { j.ProfileId, j.JobName })
+                .HasIndex(j => new { j.PreferenceId, j.JobName })
                 .IsUnique();
 
             modelBuilder.Entity<AssignedUserId>()
@@ -393,6 +393,9 @@ namespace Content.Server.Database
         public int SelectedCharacterSlot { get; set; }
         public string AdminOOCColor { get; set; } = null!;
         public List<Profile> Profiles { get; } = new();
+        public List<Job> Jobs { get; } = new();
+        public List<Antag> Antags { get; } = new();
+        [Column("pref_unavailable")] public DbPreferenceUnavailableMode PreferenceUnavailable { get; set; }
     }
 
     public class Profile
@@ -413,13 +416,9 @@ namespace Content.Server.Database
         public string EyeColor { get; set; } = null!;
         public string SkinColor { get; set; } = null!;
         public int SpawnPriority { get; set; } = 0;
-        public List<Job> Jobs { get; } = new();
-        public List<Antag> Antags { get; } = new();
         public List<Trait> Traits { get; } = new();
 
         public List<ProfileRoleLoadout> Loadouts { get; } = new();
-
-        [Column("pref_unavailable")] public DbPreferenceUnavailableMode PreferenceUnavailable { get; set; }
 
         public int PreferenceId { get; set; }
         public Preference Preference { get; set; } = null!;
@@ -428,8 +427,8 @@ namespace Content.Server.Database
     public class Job
     {
         public int Id { get; set; }
-        public Profile Profile { get; set; } = null!;
-        public int ProfileId { get; set; }
+        public Preference Preference { get; set; } = null!;
+        public int PreferenceId { get; set; }
 
         public string JobName { get; set; } = null!;
         public DbJobPriority Priority { get; set; }
@@ -447,8 +446,8 @@ namespace Content.Server.Database
     public class Antag
     {
         public int Id { get; set; }
-        public Profile Profile { get; set; } = null!;
-        public int ProfileId { get; set; }
+        public Preference Preference { get; set; } = null!;
+        public int PreferenceId { get; set; }
 
         public string AntagName { get; set; } = null!;
     }
