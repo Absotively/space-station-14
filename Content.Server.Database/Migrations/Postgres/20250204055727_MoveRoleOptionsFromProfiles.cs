@@ -51,11 +51,13 @@ UPDATE preference_job_temp
   FROM job, profile, preference
   WHERE preference_job_temp.preference_id = profile.preference_id
     AND profile.profile_id = job.profile_id
+    AND preference_job_temp.job_name = job.job_name
+    AND profile.preference_id = preference.preference_id
     AND profile.slot = preference.selected_character_slot
     AND job.priority = 3;
 ");
 
-            migrationBuilder.Sql("DROP FROM job;");
+            migrationBuilder.Sql("DELETE FROM job;");
 
             migrationBuilder.RenameColumn(
                 name: "profile_id",
@@ -99,7 +101,7 @@ AS SELECT DISTINCT preference_id, antag_name
     JOIN profile ON antag.profile_id = profile.profile_id;
 ");
 
-            migrationBuilder.Sql("DROP FROM antag;");
+            migrationBuilder.Sql("DELETE FROM antag;");
 
             migrationBuilder.RenameColumn(
                 name: "profile_id",
@@ -163,7 +165,7 @@ AS SELECT profile_id, job_name, min(2, max(priority)) priority
     JOIN profile ON profile.preference_id = preference.preference_id;
 ");
 
-            migrationBuilder.Sql("DROP FROM job;");
+            migrationBuilder.Sql("DELETE FROM job;");
 
             migrationBuilder.RenameColumn(
                 name: "preference_id",
@@ -207,7 +209,7 @@ AS SELECT profile_id, antag_name
     JOIN profile ON profile.preference_id = preference.preference_id;
 ");
 
-            migrationBuilder.Sql("DROP FROM antag;");
+            migrationBuilder.Sql("DELETE FROM antag;");
 
             migrationBuilder.RenameColumn(
                 name: "preference_id",

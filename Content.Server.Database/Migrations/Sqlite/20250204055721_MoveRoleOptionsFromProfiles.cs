@@ -10,29 +10,6 @@ namespace Content.Server.Database.Migrations.Sqlite
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "pref_unavailable",
-                table: "preference",
-                type: "INTEGER",
-                nullable: false,
-                defaultValue: 0);
-
-            /* Keep pref_unavailable setting from each player's currently selected profile */
-            migrationBuilder.Sql(@"
-UPDATE preference
-  SET preference.pref_unavailable = profile.pref_unavailable
-  FROM profile
-  WHERE profile.preference_id = preference.preference_id
-    AND profile.slot = preference.selected_character_slot;
-");
-
-            migrationBuilder.DropColumn(
-                name: "pref_unavailable",
-                table: "profile");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_job_profile_profile_id",
-                table: "job");
 
             /* For each player, keep the highest priority from any profile for each job,
              * treating High priority as Medium */
@@ -51,34 +28,65 @@ UPDATE preference_job_temp
   FROM job, profile, preference
   WHERE preference_job_temp.preference_id = profile.preference_id
     AND profile.profile_id = job.profile_id
+    AND preference_job_temp.job_name = job.job_name
+    AND profile.preference_id = preference.preference_id
     AND profile.slot = preference.selected_character_slot
     AND job.priority = 3;
 ");
 
-            migrationBuilder.Sql("DROP FROM job;");
+            /* Manually drop & recreate 'job' instead of letting EF do it automatically.
+             * 
+             * SQLite does not support renaming columns or modifying foreign key constraints on
+             * existing columns. EF apparently handles this by dropping & recreating tables
+             * automatically, if necessary, **after the rest of the migration is done.**
+             * 
+             * The updated data needs to go into the table **during** the migration. It will almost
+             * certainly fail if the old foreign key is secretly still active, despite
+             * DropForeignKey having already been called, because the table rebuild hasn't actually
+             * happened yet.
+             * 
+             * There is probably a better workaround than this but I haven't found it. */
 
-            migrationBuilder.RenameColumn(
-                name: "profile_id",
+            migrationBuilder.DropTable(name: "job");
+
+            migrationBuilder.CreateTable(
+                name: "job",
+                columns: table => new
+                {
+                    job_id = table.Column<int>(nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    preference_id = table.Column<int>(nullable: false),
+                    job_name = table.Column<string>(nullable: false),
+                    priority = table.Column<int>(nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_job", x => x.job_id);
+                    table.ForeignKey(
+                        name: "FK_job_preference_preference_id",
+                        column: x => x.preference_id,
+                        principalTable: "preference",
+                        principalColumn: "preference_id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_job_preference_id",
                 table: "job",
-                newName: "preference_id");
+                column: "preference_id");
 
-            migrationBuilder.RenameIndex(
-                name: "IX_job_profile_id_job_name",
-                table: "job",
-                newName: "IX_job_preference_id_job_name");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_job_profile_id",
-                table: "job",
-                newName: "IX_job_preference_id");
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_job_preference_preference_id",
+            migrationBuilder.CreateIndex(
+                name: "IX_job_one_high_priority",
                 table: "job",
                 column: "preference_id",
-                principalTable: "preference",
-                principalColumn: "preference_id",
-                onDelete: ReferentialAction.Cascade);
+                unique: true,
+                filter: "priority = 3");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_job_preference_id_job_name",
+                table: "job",
+                columns: new[] { "preference_id", "job_name" },
+                unique: true);
 
             migrationBuilder.Sql(@"
 INSERT INTO job(preference_id, job_name, priority)
@@ -86,10 +94,6 @@ SELECT preference_id, job_name, priority FROM preference_job_temp;
 ");
 
             migrationBuilder.Sql("DROP TABLE preference_job_temp;");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_antag_profile_profile_id",
-                table: "antag");
 
             /* Combine each player's antag preferences across all their profiles */
             migrationBuilder.Sql(@"
@@ -99,32 +103,56 @@ AS SELECT DISTINCT preference_id, antag_name
     JOIN profile ON antag.profile_id = profile.profile_id;
 ");
 
-            migrationBuilder.Sql("DROP FROM antag;");
+            /* Manually drop & recreate 'antag' for the same reason as 'job' */
 
-            migrationBuilder.RenameColumn(
-                name: "profile_id",
-                table: "antag",
-                newName: "preference_id");
+            migrationBuilder.DropTable(name: "antag");
 
-            migrationBuilder.RenameIndex(
-                name: "IX_antag_profile_id_antag_name",
-                table: "antag",
-                newName: "IX_antag_preference_id_antag_name");
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_antag_preference_preference_id",
-                table: "antag",
-                column: "preference_id",
-                principalTable: "preference",
-                principalColumn: "preference_id",
-                onDelete: ReferentialAction.Cascade);
+            migrationBuilder.CreateTable(
+                name: "antag",
+                columns: table => new
+                {
+                    antag_id = table.Column<int>(nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    preference_id = table.Column<int>(nullable: false),
+                    antag_name = table.Column<string>(nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_antag", x => x.antag_id);
+                    table.ForeignKey(
+                        name: "FK_antag_preference_preference_id",
+                        column: x => x.preference_id,
+                        principalTable: "preference",
+                        principalColumn: "preference_id",
+                        onDelete: ReferentialAction.Cascade);
+                });
 
             migrationBuilder.Sql(@"
 INSERT INTO antag(preference_id, antag_name)
-SELECT preference_id, antag_name, priority FROM preference_antag_temp;
+SELECT preference_id, antag_name FROM preference_antag_temp;
 ");
 
             migrationBuilder.Sql("DROP TABLE preference_antag_temp;");
+
+            migrationBuilder.AddColumn<int>(
+                name: "pref_unavailable",
+                table: "preference",
+                type: "INTEGER",
+                nullable: false,
+                defaultValue: 0);
+
+            /* Keep pref_unavailable setting from each player's currently selected profile */
+            migrationBuilder.Sql(@"
+UPDATE preference
+  SET pref_unavailable = profile.pref_unavailable
+  FROM profile
+  WHERE profile.preference_id = preference.preference_id
+    AND profile.slot = preference.selected_character_slot;
+");
+
+            migrationBuilder.DropColumn(
+                name: "pref_unavailable",
+                table: "profile");
         }
 
         /// <inheritdoc />
@@ -163,7 +191,7 @@ AS SELECT profile_id, job_name, min(2, max(priority)) priority
     JOIN profile ON profile.preference_id = preference.preference_id;
 ");
 
-            migrationBuilder.Sql("DROP FROM job;");
+            migrationBuilder.Sql("DELETE FROM job;");
 
             migrationBuilder.RenameColumn(
                 name: "preference_id",
@@ -207,7 +235,7 @@ AS SELECT profile_id, antag_name
     JOIN profile ON profile.preference_id = preference.preference_id;
 ");
 
-            migrationBuilder.Sql("DROP FROM antag;");
+            migrationBuilder.Sql("DELETE FROM antag;");
 
             migrationBuilder.RenameColumn(
                 name: "preference_id",
