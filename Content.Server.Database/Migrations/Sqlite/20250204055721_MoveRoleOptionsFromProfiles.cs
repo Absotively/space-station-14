@@ -17,15 +17,13 @@ namespace Content.Server.Database.Migrations.Sqlite
                 nullable: false,
                 defaultValue: 0);
 
-            /* Keep pref_unavailable setting from each player's lowest-numbered slot */
+            /* Keep pref_unavailable setting from each player's currently selected profile */
             migrationBuilder.Sql(@"
-UPDATE preference SET pref_unavailable = (
-  SELECT pref_unavailable
-    FROM profile
-    WHERE profile.preference_id = preference.preference_id
-    ORDER BY slot ASC
-    LIMIT 1
-);
+UPDATE preference
+  SET preference.pref_unavailable = profile.pref_unavailable
+  FROM profile
+  WHERE profile.preference_id = preference.preference_id
+    AND profile.slot = preference.selected_character_slot;
 ");
 
             migrationBuilder.DropColumn(
@@ -36,7 +34,7 @@ UPDATE preference SET pref_unavailable = (
                 name: "FK_job_profile_profile_id",
                 table: "job");
 
-            /* Combine each player's job preferences across all their profiles,
+            /* For each player, keep the highest priority from any profile for each job,
              * treating High priority as Medium */
             migrationBuilder.Sql(@"
 CREATE TEMP TABLE pref_job_temp
@@ -46,8 +44,16 @@ AS SELECT preference_id, job_name, min(2, max(priority)) priority
   GROUP BY preference_id, job_name;
 ");
 
-            /* TODO: Keep each player's High priority from their lowest-slot-number profile
-             * that has a High priority. Maybe. Or don't because it would be complicated. */
+            /* Keep the High priority from each player's currently selected profile */
+            migrationBuilder.Sql(@"
+UPDATE pref_job_temp
+  SET priority = 3
+  FROM job, profile, preference
+  WHERE pref_job_temp.preference_id = profile.preference_id
+    AND profile.profile_id = job.profile_id
+    AND profile.slot = preference.selected_character_slot
+    AND job.priority = 3;
+");
 
             migrationBuilder.Sql("DROP FROM job;");
 
