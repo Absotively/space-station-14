@@ -10,30 +10,6 @@ namespace Content.Server.Database.Migrations.Postgres
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "pref_unavailable",
-                table: "preference",
-                type: "integer",
-                nullable: false,
-                defaultValue: 0);
-
-            /* Keep pref_unavailable setting from each player's currently selected profile */
-            migrationBuilder.Sql(@"
-UPDATE preference
-  SET pref_unavailable = profile.pref_unavailable
-  FROM profile
-  WHERE profile.preference_id = preference.preference_id
-    AND profile.slot = preference.selected_character_slot;
-");
-
-            migrationBuilder.DropColumn(
-                name: "pref_unavailable",
-                table: "profile");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_job_profile_profile_id",
-                table: "job");
-
             /* For each player, keep the highest priority from any profile for each job,
              * treating High priority as Medium */
             migrationBuilder.Sql(@"
@@ -58,6 +34,10 @@ UPDATE preference_job_temp
 ");
 
             migrationBuilder.Sql("DELETE FROM job;");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_job_profile_profile_id",
+                table: "job");
 
             migrationBuilder.RenameColumn(
                 name: "profile_id",
@@ -89,10 +69,6 @@ SELECT preference_id, job_name, priority FROM preference_job_temp;
 
             migrationBuilder.Sql("DROP TABLE preference_job_temp;");
 
-            migrationBuilder.DropForeignKey(
-                name: "FK_antag_profile_profile_id",
-                table: "antag");
-
             /* Combine each player's antag preferences across all their profiles */
             migrationBuilder.Sql(@"
 CREATE TEMP TABLE preference_antag_temp
@@ -102,6 +78,10 @@ AS SELECT DISTINCT preference_id, antag_name
 ");
 
             migrationBuilder.Sql("DELETE FROM antag;");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_antag_profile_profile_id",
+                table: "antag");
 
             migrationBuilder.RenameColumn(
                 name: "profile_id",
@@ -127,6 +107,26 @@ SELECT preference_id, antag_name FROM preference_antag_temp;
 ");
 
             migrationBuilder.Sql("DROP TABLE preference_antag_temp;");
+
+            migrationBuilder.AddColumn<int>(
+                name: "pref_unavailable",
+                table: "preference",
+                type: "integer",
+                nullable: false,
+                defaultValue: 0);
+
+            /* Keep pref_unavailable setting from each player's currently selected profile */
+            migrationBuilder.Sql(@"
+UPDATE preference
+  SET pref_unavailable = profile.pref_unavailable
+  FROM profile
+  WHERE profile.preference_id = preference.preference_id
+    AND profile.slot = preference.selected_character_slot;
+");
+
+            migrationBuilder.DropColumn(
+                name: "pref_unavailable",
+                table: "profile");
         }
 
         /// <inheritdoc />
@@ -134,28 +134,6 @@ SELECT preference_id, antag_name FROM preference_antag_temp;
         {
             /* For lack of better ideas, copy each preference's role options to each
              * of its profiles */
-
-            migrationBuilder.AddColumn<int>(
-                name: "pref_unavailable",
-                table: "profile",
-                type: "integer",
-                nullable: false,
-                defaultValue: 0);
-
-            migrationBuilder.Sql(@"
-UPDATE profile
-  SET pref_unavailable = preference.pref_unavailable
-  FROM preference
-  WHERE preference.preference_id = profile.preference_id;
-");
-
-            migrationBuilder.DropColumn(
-                name: "pref_unavailable",
-                table: "preference");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_job_preference_preference_id",
-                table: "job");
 
             migrationBuilder.Sql(@"
 CREATE TEMP TABLE profile_job_temp
@@ -166,6 +144,10 @@ AS SELECT profile_id, job_name, priority
 ");
 
             migrationBuilder.Sql("DELETE FROM job;");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_job_preference_preference_id",
+                table: "job");
 
             migrationBuilder.RenameColumn(
                 name: "preference_id",
@@ -235,6 +217,24 @@ SELECT profile_id, antag_name FROM profile_antag_temp;
 ");
 
             migrationBuilder.Sql("DROP TABLE profile_antag_temp;");
+
+            migrationBuilder.AddColumn<int>(
+                name: "pref_unavailable",
+                table: "profile",
+                type: "integer",
+                nullable: false,
+                defaultValue: 0);
+
+            migrationBuilder.Sql(@"
+UPDATE profile
+  SET pref_unavailable = preference.pref_unavailable
+  FROM preference
+  WHERE preference.preference_id = profile.preference_id;
+");
+
+            migrationBuilder.DropColumn(
+                name: "pref_unavailable",
+                table: "preference");
         }
     }
 }
