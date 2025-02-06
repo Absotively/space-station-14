@@ -20,7 +20,7 @@ namespace Content.Server.Database.Migrations.Postgres
             /* Keep pref_unavailable setting from each player's currently selected profile */
             migrationBuilder.Sql(@"
 UPDATE preference
-  SET preference.pref_unavailable = profile.pref_unavailable
+  SET pref_unavailable = profile.pref_unavailable
   FROM profile
   WHERE profile.preference_id = preference.preference_id
     AND profile.slot = preference.selected_character_slot;
@@ -38,7 +38,7 @@ UPDATE preference
              * treating High priority as Medium */
             migrationBuilder.Sql(@"
 CREATE TEMP TABLE preference_job_temp
-AS SELECT preference_id, job_name, min(2, max(priority)) priority
+AS SELECT preference_id, job_name, LEAST(2, max(priority)) priority
   FROM job
     JOIN profile ON job.profile_id = profile.profile_id
   GROUP BY preference_id, job_name;
@@ -123,7 +123,7 @@ AS SELECT DISTINCT preference_id, antag_name
 
             migrationBuilder.Sql(@"
 INSERT INTO antag(preference_id, antag_name)
-SELECT preference_id, antag_name, priority FROM preference_antag_temp;
+SELECT preference_id, antag_name FROM preference_antag_temp;
 ");
 
             migrationBuilder.Sql("DROP TABLE preference_antag_temp;");
@@ -159,7 +159,7 @@ UPDATE profile
 
             migrationBuilder.Sql(@"
 CREATE TEMP TABLE profile_job_temp
-AS SELECT profile_id, job_name, min(2, max(priority)) priority
+AS SELECT profile_id, job_name, priority
   FROM job
     JOIN preference ON job.preference_id = preference.preference_id
     JOIN profile ON profile.preference_id = preference.preference_id;
@@ -231,7 +231,7 @@ AS SELECT profile_id, antag_name
 
             migrationBuilder.Sql(@"
 INSERT INTO antag(profile_id, antag_name)
-SELECT profile_id, antag_name, priority FROM profile_antag_temp;
+SELECT profile_id, antag_name FROM profile_antag_temp;
 ");
 
             migrationBuilder.Sql("DROP TABLE profile_antag_temp;");
