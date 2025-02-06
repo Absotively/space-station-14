@@ -37,7 +37,7 @@ UPDATE preference_job_temp
             /* Manually drop & recreate 'job' instead of letting EF do it automatically.
              * 
              * SQLite does not support renaming columns or modifying foreign key constraints on
-             * existing columns. EF apparently handles this by dropping & recreating tables
+             * existing columns. EF Core apparently handles this by dropping & recreating tables
              * automatically, if necessary, **after the rest of the migration is done.**
              * 
              * The updated data needs to go into the table **during** the migration. It will almost
@@ -104,7 +104,6 @@ AS SELECT DISTINCT preference_id, antag_name
 ");
 
             /* Manually drop & recreate 'antag' for the same reason as 'job' */
-
             migrationBuilder.DropTable(name: "antag");
 
             migrationBuilder.CreateTable(
@@ -126,6 +125,12 @@ AS SELECT DISTINCT preference_id, antag_name
                         principalColumn: "preference_id",
                         onDelete: ReferentialAction.Cascade);
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_antag_preference_id_antag_name",
+                table: "antag",
+                columns: new[] { "preference_id", "antag_name" },
+                unique: true);
 
             migrationBuilder.Sql(@"
 INSERT INTO antag(preference_id, antag_name)
@@ -161,6 +166,107 @@ UPDATE preference
             /* For lack of better ideas, copy each preference's role options to each
              * of its profiles */
 
+            migrationBuilder.Sql(@"
+CREATE TEMP TABLE profile_job_temp
+AS SELECT profile_id, job_name, priority
+  FROM job
+    JOIN preference ON job.preference_id = preference.preference_id
+    JOIN profile ON profile.preference_id = preference.preference_id;
+");
+
+            /* Drop and recreate 'job' for the same reason as in Up */
+            migrationBuilder.DropTable(name: "job");
+
+            migrationBuilder.CreateTable(
+                name: "job",
+                columns: table => new
+                {
+                    job_id = table.Column<int>(nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    profile_id = table.Column<int>(nullable: false),
+                    job_name = table.Column<string>(nullable: false),
+                    priority = table.Column<int>(nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_job", x => x.job_id);
+                    table.ForeignKey(
+                        name: "FK_job_profile_profile_id",
+                        column: x => x.profile_id,
+                        principalTable: "profile",
+                        principalColumn: "profile_id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_job_profile_id",
+                table: "job",
+                column: "profile_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_job_one_high_priority",
+                table: "job",
+                column: "profile_id",
+                unique: true,
+                filter: "priority = 3");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_job_profile_id_job_name",
+                table: "job",
+                columns: new[] { "profile_id", "job_name" },
+                unique: true);
+
+            migrationBuilder.Sql(@"
+INSERT INTO job(profile_id, job_name, priority)
+SELECT profile_id, job_name, priority FROM profile_job_temp;
+");
+
+            migrationBuilder.Sql("DROP TABLE profile_job_temp;");
+
+            migrationBuilder.Sql(@"
+CREATE TEMP TABLE profile_antag_temp
+AS SELECT profile_id, antag_name
+  FROM antag
+    JOIN preference ON antag.preference_id = preference.preference_id
+    JOIN profile ON profile.preference_id = preference.preference_id;
+");
+
+            /* Drop and recreate 'antag' for the same reason as 'job' in Up */
+            migrationBuilder.DropTable(name: "antag");
+
+            migrationBuilder.CreateTable(
+                name: "antag",
+                columns: table => new
+                {
+                    antag_id = table.Column<int>(nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    profile_id = table.Column<int>(nullable: false),
+                    antag_name = table.Column<string>(nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_antag", x => x.antag_id);
+                    table.ForeignKey(
+                        name: "FK_antag_profile_profile_id",
+                        column: x => x.profile_id,
+                        principalTable: "profile",
+                        principalColumn: "profile_id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_antag_profile_id_antag_name",
+                table: "antag",
+                columns: new[] { "profile_id", "antag_name" },
+                unique: true);
+
+            migrationBuilder.Sql(@"
+INSERT INTO antag(profile_id, antag_name)
+SELECT profile_id, antag_name FROM profile_antag_temp;
+");
+
+            migrationBuilder.Sql("DROP TABLE profile_antag_temp;");
+
             migrationBuilder.AddColumn<int>(
                 name: "pref_unavailable",
                 table: "profile",
@@ -178,89 +284,6 @@ UPDATE profile
             migrationBuilder.DropColumn(
                 name: "pref_unavailable",
                 table: "preference");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_job_preference_preference_id",
-                table: "job");
-
-            migrationBuilder.Sql(@"
-CREATE TEMP TABLE profile_job_temp
-AS SELECT profile_id, job_name, min(2, max(priority)) priority
-  FROM job
-    JOIN preference ON job.preference_id = preference.preference_id
-    JOIN profile ON profile.preference_id = preference.preference_id;
-");
-
-            migrationBuilder.Sql("DELETE FROM job;");
-
-            migrationBuilder.RenameColumn(
-                name: "preference_id",
-                table: "job",
-                newName: "profile_id");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_job_preference_id_job_name",
-                table: "job",
-                newName: "IX_job_profile_id_job_name");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_job_preference_id",
-                table: "job",
-                newName: "IX_job_profile_id");
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_job_profile_profile_id",
-                table: "job",
-                column: "profile_id",
-                principalTable: "profile",
-                principalColumn: "profile_id",
-                onDelete: ReferentialAction.Cascade);
-
-            migrationBuilder.Sql(@"
-INSERT INTO job(profile_id, job_name, priority)
-SELECT profile_id, job_name, priority FROM profile_job_temp;
-");
-
-            migrationBuilder.Sql("DROP TABLE profile_job_temp;");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_antag_preference_preference_id",
-                table: "antag");
-
-            migrationBuilder.Sql(@"
-CREATE TEMP TABLE profile_antag_temp
-AS SELECT profile_id, antag_name
-  FROM antag
-    JOIN preference ON antag.preference_id = preference.preference_id
-    JOIN profile ON profile.preference_id = preference.preference_id;
-");
-
-            migrationBuilder.Sql("DELETE FROM antag;");
-
-            migrationBuilder.RenameColumn(
-                name: "preference_id",
-                table: "antag",
-                newName: "profile_id");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_antag_preference_id_antag_name",
-                table: "antag",
-                newName: "IX_antag_profile_id_antag_name");
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_antag_profile_profile_id",
-                table: "antag",
-                column: "profile_id",
-                principalTable: "profile",
-                principalColumn: "profile_id",
-                onDelete: ReferentialAction.Cascade);
-
-            migrationBuilder.Sql(@"
-INSERT INTO antag(profile_id, antag_name)
-SELECT profile_id, antag_name, priority FROM profile_antag_temp;
-");
-
-            migrationBuilder.Sql("DROP TABLE profile_antag_temp;");
         }
     }
 }
