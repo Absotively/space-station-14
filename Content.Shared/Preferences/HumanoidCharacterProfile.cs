@@ -32,23 +32,6 @@ namespace Content.Shared.Preferences
         public const int MaxDescLength = 512;
 
         /// <summary>
-        /// Job preferences for initial spawn.
-        /// </summary>
-        [DataField]
-        private Dictionary<ProtoId<JobPrototype>, JobPriority> _jobPriorities = new()
-        {
-            {
-                SharedGameTicker.FallbackOverflowJob, JobPriority.High
-            }
-        };
-
-        /// <summary>
-        /// Antags we have opted in to.
-        /// </summary>
-        [DataField]
-        private HashSet<ProtoId<AntagPrototype>> _antagPreferences = new();
-
-        /// <summary>
         /// Enabled traits.
         /// </summary>
         [DataField]
@@ -104,26 +87,9 @@ namespace Content.Shared.Preferences
         public SpawnPriorityPreference SpawnPriority { get; private set; } = SpawnPriorityPreference.None;
 
         /// <summary>
-        /// <see cref="_jobPriorities"/>
-        /// </summary>
-        public IReadOnlyDictionary<ProtoId<JobPrototype>, JobPriority> JobPriorities => _jobPriorities;
-
-        /// <summary>
-        /// <see cref="_antagPreferences"/>
-        /// </summary>
-        public IReadOnlySet<ProtoId<AntagPrototype>> AntagPreferences => _antagPreferences;
-
-        /// <summary>
         /// <see cref="_traitPreferences"/>
         /// </summary>
         public IReadOnlySet<ProtoId<TraitPrototype>> TraitPreferences => _traitPreferences;
-
-        /// <summary>
-        /// If we're unable to get one of our preferred jobs do we spawn as a fallback job or do we stay in lobby.
-        /// </summary>
-        [DataField]
-        public PreferenceUnavailableMode PreferenceUnavailable { get; private set; } =
-            PreferenceUnavailableMode.SpawnAsOverflow;
 
         public HumanoidCharacterProfile(
             string name,
@@ -134,9 +100,6 @@ namespace Content.Shared.Preferences
             Gender gender,
             HumanoidCharacterAppearance appearance,
             SpawnPriorityPreference spawnPriority,
-            Dictionary<ProtoId<JobPrototype>, JobPriority> jobPriorities,
-            PreferenceUnavailableMode preferenceUnavailable,
-            HashSet<ProtoId<AntagPrototype>> antagPreferences,
             HashSet<ProtoId<TraitPrototype>> traitPreferences,
             Dictionary<string, RoleLoadout> loadouts)
         {
@@ -148,25 +111,8 @@ namespace Content.Shared.Preferences
             Gender = gender;
             Appearance = appearance;
             SpawnPriority = spawnPriority;
-            _jobPriorities = jobPriorities;
-            PreferenceUnavailable = preferenceUnavailable;
-            _antagPreferences = antagPreferences;
             _traitPreferences = traitPreferences;
             _loadouts = loadouts;
-
-            var hasHighPrority = false;
-            foreach (var (key, value) in _jobPriorities)
-            {
-                if (value == JobPriority.Never)
-                    _jobPriorities.Remove(key);
-                else if (value != JobPriority.High)
-                    continue;
-
-                if (hasHighPrority)
-                    _jobPriorities[key] = JobPriority.Medium;
-
-                hasHighPrority = true;
-            }
         }
 
         /// <summary>Copy constructor</summary>
@@ -179,9 +125,6 @@ namespace Content.Shared.Preferences
                 other.Gender,
                 other.Appearance.Clone(),
                 other.SpawnPriority,
-                new Dictionary<ProtoId<JobPrototype>, JobPriority>(other.JobPriorities),
-                other.PreferenceUnavailable,
-                new HashSet<ProtoId<AntagPrototype>>(other.AntagPreferences),
                 new HashSet<ProtoId<TraitPrototype>>(other.TraitPreferences),
                 new Dictionary<string, RoleLoadout>(other.Loadouts))
         {
@@ -303,90 +246,6 @@ namespace Content.Shared.Preferences
             return new(this) { SpawnPriority = spawnPriority };
         }
 
-        public HumanoidCharacterProfile WithJobPriorities(IEnumerable<KeyValuePair<ProtoId<JobPrototype>, JobPriority>> jobPriorities)
-        {
-            var dictionary = new Dictionary<ProtoId<JobPrototype>, JobPriority>(jobPriorities);
-            var hasHighPrority = false;
-
-            foreach (var (key, value) in dictionary)
-            {
-                if (value == JobPriority.Never)
-                    dictionary.Remove(key);
-                else if (value != JobPriority.High)
-                    continue;
-
-                if (hasHighPrority)
-                    dictionary[key] = JobPriority.Medium;
-
-                hasHighPrority = true;
-            }
-
-            return new(this)
-            {
-                _jobPriorities = dictionary
-            };
-        }
-
-        public HumanoidCharacterProfile WithJobPriority(ProtoId<JobPrototype> jobId, JobPriority priority)
-        {
-            var dictionary = new Dictionary<ProtoId<JobPrototype>, JobPriority>(_jobPriorities);
-            if (priority == JobPriority.Never)
-            {
-                dictionary.Remove(jobId);
-            }
-            else if (priority == JobPriority.High)
-            {
-                // There can only ever be one high priority job.
-                foreach (var (job, value) in dictionary)
-                {
-                    if (value == JobPriority.High)
-                        dictionary[job] = JobPriority.Medium;
-                }
-
-                dictionary[jobId] = priority;
-            }
-            else
-            {
-                dictionary[jobId] = priority;
-            }
-
-            return new(this)
-            {
-                _jobPriorities = dictionary,
-            };
-        }
-
-        public HumanoidCharacterProfile WithPreferenceUnavailable(PreferenceUnavailableMode mode)
-        {
-            return new(this) { PreferenceUnavailable = mode };
-        }
-
-        public HumanoidCharacterProfile WithAntagPreferences(IEnumerable<ProtoId<AntagPrototype>> antagPreferences)
-        {
-            return new(this)
-            {
-                _antagPreferences = new (antagPreferences),
-            };
-        }
-
-        public HumanoidCharacterProfile WithAntagPreference(ProtoId<AntagPrototype> antagId, bool pref)
-        {
-            var list = new HashSet<ProtoId<AntagPrototype>>(_antagPreferences);
-            if (pref)
-            {
-                list.Add(antagId);
-            }
-            else
-            {
-                list.Remove(antagId);
-            }
-
-            return new(this)
-            {
-                _antagPreferences = list,
-            };
-        }
-
         public HumanoidCharacterProfile WithTraitPreference(ProtoId<TraitPrototype> traitId, IPrototypeManager protoManager)
         {
             // null category is assumed to be default.
@@ -462,10 +321,7 @@ namespace Content.Shared.Preferences
             if (Sex != other.Sex) return false;
             if (Gender != other.Gender) return false;
             if (Species != other.Species) return false;
-            if (PreferenceUnavailable != other.PreferenceUnavailable) return false;
             if (SpawnPriority != other.SpawnPriority) return false;
-            if (!_jobPriorities.SequenceEqual(other._jobPriorities)) return false;
-            if (!_antagPreferences.SequenceEqual(other._antagPreferences)) return false;
             if (!_traitPreferences.SequenceEqual(other._traitPreferences)) return false;
             if (!Loadouts.SequenceEqual(other.Loadouts)) return false;
             if (FlavorText != other.FlavorText) return false;
@@ -550,13 +406,6 @@ namespace Content.Shared.Preferences
 
             var appearance = HumanoidCharacterAppearance.EnsureValid(Appearance, Species, Sex);
 
-            var prefsUnavailableMode = PreferenceUnavailable switch
-            {
-                PreferenceUnavailableMode.StayInLobby => PreferenceUnavailableMode.StayInLobby,
-                PreferenceUnavailableMode.SpawnAsOverflow => PreferenceUnavailableMode.SpawnAsOverflow,
-                _ => PreferenceUnavailableMode.StayInLobby // Invalid enum values.
-            };
-
             var spawnPriority = SpawnPriority switch
             {
                 SpawnPriorityPreference.None => SpawnPriorityPreference.None,
@@ -564,31 +413,6 @@ namespace Content.Shared.Preferences
                 SpawnPriorityPreference.Cryosleep => SpawnPriorityPreference.Cryosleep,
                 _ => SpawnPriorityPreference.None // Invalid enum values.
             };
-
-            var priorities = new Dictionary<ProtoId<JobPrototype>, JobPriority>(JobPriorities
-                .Where(p => prototypeManager.TryIndex<JobPrototype>(p.Key, out var job) && job.SetPreference && p.Value switch
-                {
-                    JobPriority.Never => false, // Drop never since that's assumed default.
-                    JobPriority.Low => true,
-                    JobPriority.Medium => true,
-                    JobPriority.High => true,
-                    _ => false
-                }));
-
-            var hasHighPrio = false;
-            foreach (var (key, value) in priorities)
-            {
-                if (value != JobPriority.High)
-                    continue;
-
-                if (hasHighPrio)
-                    priorities[key] = JobPriority.Medium;
-                hasHighPrio = true;
-            }
-
-            var antags = AntagPreferences
-                .Where(id => prototypeManager.TryIndex(id, out var antag) && antag.SetPreference)
-                .ToList();
 
             var traits = TraitPreferences
                          .Where(prototypeManager.HasIndex)
@@ -601,18 +425,6 @@ namespace Content.Shared.Preferences
             Gender = gender;
             Appearance = appearance;
             SpawnPriority = spawnPriority;
-
-            _jobPriorities.Clear();
-
-            foreach (var (job, priority) in priorities)
-            {
-                _jobPriorities.Add(job, priority);
-            }
-
-            PreferenceUnavailable = prefsUnavailableMode;
-
-            _antagPreferences.Clear();
-            _antagPreferences.UnionWith(antags);
 
             _traitPreferences.Clear();
             _traitPreferences.UnionWith(GetValidTraits(traits, prototypeManager));
@@ -699,8 +511,6 @@ namespace Content.Shared.Preferences
         public override int GetHashCode()
         {
             var hashCode = new HashCode();
-            hashCode.Add(_jobPriorities);
-            hashCode.Add(_antagPreferences);
             hashCode.Add(_traitPreferences);
             hashCode.Add(_loadouts);
             hashCode.Add(Name);
@@ -711,7 +521,6 @@ namespace Content.Shared.Preferences
             hashCode.Add((int)Gender);
             hashCode.Add(Appearance);
             hashCode.Add((int)SpawnPriority);
-            hashCode.Add((int)PreferenceUnavailable);
             return hashCode.ToHashCode();
         }
 

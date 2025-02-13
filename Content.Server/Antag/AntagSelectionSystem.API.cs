@@ -168,8 +168,8 @@ public sealed partial class AntagSelectionSystem
         if (def.PrefRoles.Count == 0)
             return false;
 
-        var pref = (HumanoidCharacterProfile) _pref.GetPreferences(session.UserId).SelectedCharacter;
-        return pref.AntagPreferences.Any(p => def.PrefRoles.Contains(p));
+        var pref = _pref.GetPreferences(session.UserId);
+        return pref.RolePreferences.AntagPreferences.Any(p => def.PrefRoles.Contains(p));
     }
 
     /// <summary>
@@ -183,8 +183,8 @@ public sealed partial class AntagSelectionSystem
         if (def.FallbackRoles.Count == 0)
             return false;
 
-        var pref = (HumanoidCharacterProfile) _pref.GetPreferences(session.UserId).SelectedCharacter;
-        return pref.AntagPreferences.Any(p => def.FallbackRoles.Contains(p));
+        var pref = _pref.GetPreferences(session.UserId);
+        return pref.RolePreferences.AntagPreferences.Any(p => def.FallbackRoles.Contains(p));
     }
 
     /// <summary>

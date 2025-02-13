@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -173,13 +173,11 @@ public sealed partial class TestPair
         var prefMan = Server.ResolveDependency<IServerPreferencesManager>();
         var prefs = prefMan.GetPreferences(userId);
 
-        // Automatic preference resetting only resets slot 0.
-        Assert.That(prefs.SelectedCharacterIndex, Is.EqualTo(0));
-
-        var profile = (HumanoidCharacterProfile) prefs.Characters[0];
-        var newProfile = profile.WithAntagPreference(id, value);
+        var newRolePrefs = prefs.RolePreferences.WithAntagPreference(id, value);
+        var newPrefs = new PlayerPreferences(prefs.Characters, prefs.SelectedCharacterIndex, prefs.AdminOOCColor, newRolePrefs);
         _modifiedProfiles.Add(userId);
-        await Server.WaitPost(() => prefMan.SetProfile(userId, 0, newProfile).Wait());
+        // TODO: make this actually work again
+        await Server.WaitPost(() => prefMan.SetRolePreferences(userId, newRolePrefs).Wait());
     }
 
     /// <summary>
@@ -204,11 +202,7 @@ public sealed partial class TestPair
 
         var prefMan = Server.ResolveDependency<IServerPreferencesManager>();
         var prefs = prefMan.GetPreferences(user);
-        var profile = (HumanoidCharacterProfile) prefs.Characters[0];
-        var dictionary = new Dictionary<ProtoId<JobPrototype>, JobPriority>(profile.JobPriorities);
-
-        // Automatic preference resetting only resets slot 0.
-        Assert.That(prefs.SelectedCharacterIndex, Is.EqualTo(0));
+        var dictionary = new Dictionary<ProtoId<JobPrototype>, JobPriority>(prefs.RolePreferences.JobPriorities);
 
         if (highCount != 0)
         {
@@ -227,8 +221,8 @@ public sealed partial class TestPair
                 dictionary[job] = priority;
         }
 
-        var newProfile = profile.WithJobPriorities(dictionary);
+        var newRolePrefs = prefs.RolePreferences.WithJobPriorities(dictionary);
         _modifiedProfiles.Add(user);
-        await Server.WaitPost(() => prefMan.SetProfile(user, 0, newProfile).Wait());
+        await Server.WaitPost(() => prefMan.SetRolePreferences(user, newRolePrefs).Wait());
     }
 }

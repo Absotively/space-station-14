@@ -42,7 +42,7 @@ public sealed partial class StationJobsSystem
     /// Assigns jobs based on the given preferences and list of stations to assign for.
     /// This does NOT change the slots on the station, only figures out where each player should go.
     /// </summary>
-    /// <param name="profiles">The profiles to use for selection.</param>
+    /// <param name="preferences">Player role preferences to use for selection.</param>
     /// <param name="stations">List of stations to assign for.</param>
     /// <param name="useRoundStartJobs">Whether or not to use the round-start jobs for the stations instead of their current jobs.</param>
     /// <returns>List of players and their assigned jobs.</returns>
@@ -51,20 +51,20 @@ public sealed partial class StationJobsSystem
     /// as there may end up being more round-start slots than available slots, which can cause weird behavior.
     /// A warning to all who enter ye cursed lands: This function is long and mildly incomprehensible. Best used without touching.
     /// </remarks>
-    public Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid)> AssignJobs(Dictionary<NetUserId, HumanoidCharacterProfile> profiles, IReadOnlyList<EntityUid> stations, bool useRoundStartJobs = true)
+    public Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid)> AssignJobs(Dictionary<NetUserId, RolePreferences> preferences, IReadOnlyList<EntityUid> stations, bool useRoundStartJobs = true)
     {
         DebugTools.Assert(stations.Count > 0);
 
         InitializeRoundStart();
 
-        if (profiles.Count == 0)
+        if (preferences.Count == 0)
             return new();
 
         // We need to modify this collection later, so make a copy of it.
-        profiles = profiles.ShallowClone();
+        var unassignedPlayerRolePrefs = preferences.ShallowClone();
 
         // Player <-> (job, station)
-        var assigned = new Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid)>(profiles.Count);
+        var assigned = new Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid)>(unassignedPlayerRolePrefs.Count);
 
         // The jobs left on the stations. This collection is modified as jobs are assigned to track what's available.
         var stationJobs = new Dictionary<EntityUid, Dictionary<ProtoId<JobPrototype>, int?>>();
@@ -103,10 +103,10 @@ public sealed partial class StationJobsSystem
         {
             for (var selectedPriority = JobPriority.High; selectedPriority > JobPriority.Never; selectedPriority--)
             {
-                if (profiles.Count == 0)
+                if (unassignedPlayerRolePrefs.Count == 0)
                     goto endFunc;
 
-                var candidates = GetPlayersJobCandidates(weight, selectedPriority, profiles);
+                var candidates = GetPlayersJobCandidates(weight, selectedPriority, unassignedPlayerRolePrefs);
 
                 var optionsRemaining = 0;
 
@@ -122,7 +122,7 @@ public sealed partial class StationJobsSystem
                     }
 
                     stationJobs[station][job]--;
-                    profiles.Remove(player);
+                    unassignedPlayerRolePrefs.Remove(player);
                     assigned.Add(player, (job, station));
 
                     optionsRemaining--;
@@ -270,12 +270,12 @@ public sealed partial class StationJobsSystem
     /// </summary>
     /// <param name="assignedJobs">All assigned jobs.</param>
     /// <param name="allPlayersToAssign">All players that might need an overflow assigned.</param>
-    /// <param name="profiles">Player character profiles.</param>
+    /// <param name="preferences">Player role preferences.</param>
     /// <param name="stations">The stations to consider for spawn location.</param>
     public void AssignOverflowJobs(
         ref Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid)> assignedJobs,
         IEnumerable<NetUserId> allPlayersToAssign,
-        IReadOnlyDictionary<NetUserId, HumanoidCharacterProfile> profiles,
+        IReadOnlyDictionary<NetUserId, RolePreferences> preferences,
         IReadOnlyList<EntityUid> stations)
     {
         var givenStations = stations.ToList();
@@ -289,8 +289,8 @@ public sealed partial class StationJobsSystem
                 continue;
             }
 
-            var profile = profiles[player];
-            if (profile.PreferenceUnavailable != PreferenceUnavailableMode.SpawnAsOverflow)
+            var prefs = preferences[player];
+            if (prefs.PreferenceUnavailable != PreferenceUnavailableMode.SpawnAsOverflow)
             {
                 assignedJobs.Add(player, (null, EntityUid.Invalid));
                 continue;
@@ -336,24 +336,25 @@ public sealed partial class StationJobsSystem
     /// </summary>
     /// <param name="weight">Weight to find, if any.</param>
     /// <param name="selectedPriority">Priority to find, if any.</param>
-    /// <param name="profiles">Profiles to look in.</param>
+    /// <param name="preferences">Player role preferences.</param>
     /// <returns>Players and a list of their matching jobs.</returns>
-    private Dictionary<NetUserId, List<string>> GetPlayersJobCandidates(int? weight, JobPriority? selectedPriority, Dictionary<NetUserId, HumanoidCharacterProfile> profiles)
+    private Dictionary<NetUserId, List<string>> GetPlayersJobCandidates(int? weight, JobPriority? selectedPriority, Dictionary<NetUserId, RolePreferences> preferences)
     {
-        var outputDict = new Dictionary<NetUserId, List<string>>(profiles.Count);
+        var outputDict = new Dictionary<NetUserId, List<string>>(preferences.Count);
 
-        foreach (var (player, profile) in profiles)
+        foreach (var (player, prefs) in preferences)
         {
             var roleBans = _banManager.GetJobBans(player);
-            var profileJobs = profile.JobPriorities.Keys.Select(k => new ProtoId<JobPrototype>(k)).ToList();
-            var ev = new StationJobsGetCandidatesEvent(player, profileJobs);
+            var prefsJobs
+                = prefs.JobPriorities.Keys.Select(k => new ProtoId<JobPrototype>(k)).ToList();
+            var ev = new StationJobsGetCandidatesEvent(player, prefsJobs);
             RaiseLocalEvent(ref ev);
 
             List<string>? availableJobs = null;
 
-            foreach (var jobId in profileJobs)
+            foreach (var jobId in prefsJobs)
             {
-                var priority = profile.JobPriorities[jobId];
+                var priority = prefs.JobPriorities[jobId];
 
                 if (!(priority == selectedPriority || selectedPriority is null))
                     continue;
@@ -367,7 +368,7 @@ public sealed partial class StationJobsSystem
                 if (!(roleBans == null || !roleBans.Contains(jobId)))
                     continue;
 
-                availableJobs ??= new List<string>(profile.JobPriorities.Count);
+                availableJobs ??= new List<string>(prefs.JobPriorities.Count);
                 availableJobs.Add(jobId);
             }
 

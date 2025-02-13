@@ -42,6 +42,8 @@ namespace Content.Server.Database
 
         Task SaveAdminOOCColorAsync(NetUserId userId, Color color);
 
+        Task SaveRolePreferencesAsync(NetUserId userId, IRolePreferences rolePreferences);
+
         // Single method for two operations for transaction.
         Task DeleteSlotAndSetSelectedIndex(NetUserId userId, int deleteSlot, int newSlot);
         Task<PlayerPreferences?> GetPlayerPreferencesAsync(NetUserId userId, CancellationToken cancel);
@@ -485,6 +487,12 @@ namespace Content.Server.Database
         {
             DbWriteOpsMetric.Inc();
             return RunDbCommand(() => _db.SaveAdminOOCColorAsync(userId, color));
+        }
+
+        public Task SaveRolePreferencesAsync(NetUserId userId, IRolePreferences rolePreferences)
+        {
+            DbWriteOpsMetric.Inc();
+            return RunDbCommand(() => _db.SaveRolePreferencesAsync(userId, rolePreferences));
         }
 
         public Task<PlayerPreferences?> GetPlayerPreferencesAsync(NetUserId userId, CancellationToken cancel)

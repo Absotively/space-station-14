@@ -415,11 +415,11 @@ public sealed partial class StationJobsSystem : EntitySystem
     /// Looks at the given priority list, and picks the best available job (optionally with the given exclusions)
     /// </summary>
     /// <param name="station">Station to pick from.</param>
-    /// <param name="jobPriorities">The priority list to use for selecting a job.</param>
+    /// <param name="rolePreferences">The role preferences to use for selecting a job.</param>
     /// <param name="pickOverflows">Whether or not to pick from the overflow list.</param>
     /// <param name="disallowedJobs">A set of disallowed jobs, if any.</param>
     /// <returns>The selected job, if any.</returns>
-    public ProtoId<JobPrototype>? PickBestAvailableJobWithPriority(EntityUid station, IReadOnlyDictionary<ProtoId<JobPrototype>, JobPriority> jobPriorities, bool pickOverflows, IReadOnlySet<ProtoId<JobPrototype>>? disallowedJobs = null)
+    public ProtoId<JobPrototype>? PickBestAvailableJobWithPriority(EntityUid station, RolePreferences rolePreferences, bool pickOverflows, IReadOnlySet<ProtoId<JobPrototype>>? disallowedJobs = null)
     {
         if (station == EntityUid.Invalid)
             return null;
@@ -427,7 +427,7 @@ public sealed partial class StationJobsSystem : EntitySystem
         var available = GetAvailableJobs(station);
         bool TryPick(JobPriority priority, [NotNullWhen(true)] out ProtoId<JobPrototype>? jobId)
         {
-            var filtered = jobPriorities
+            var filtered = rolePreferences.JobPriorities
                 .Where(p =>
                             p.Value == priority
                             && disallowedJobs != null

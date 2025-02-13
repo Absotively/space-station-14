@@ -29,6 +29,7 @@ namespace Content.Client.Lobby.UI
         {
             DefaultState.Visible = false;
             CharacterSetupState.Visible = false;
+            RoleSetupState.Visible = false;
 
             switch (state)
             {
@@ -37,18 +38,34 @@ namespace Content.Client.Lobby.UI
                     RightSide.Visible = true;
                     break;
                 case LobbyGuiState.CharacterSetup:
-                    CharacterSetupState.Visible = true;
-
-                    var actualWidth = (float) UserInterfaceManager.RootControl.PixelWidth;
-                    var setupWidth = (float) LeftSide.PixelWidth;
-
-                    if (1 - (setupWidth / actualWidth) > 0.30)
                     {
-                        RightSide.Visible = false;
+                        CharacterSetupState.Visible = true;
+
+                        var actualWidth = (float)UserInterfaceManager.RootControl.PixelWidth;
+                        var setupWidth = (float)LeftSide.PixelWidth;
+
+                        if (1 - (setupWidth / actualWidth) > 0.30)
+                        {
+                            RightSide.Visible = false;
+                        }
+
+                        UserInterfaceManager.GetUIController<LobbyUIController>().ReloadCharacterSetup();
                     }
+                    break;
+                case LobbyGuiState.RoleSetup:
+                    {
+                        RoleSetupState.Visible = true;
 
-                    UserInterfaceManager.GetUIController<LobbyUIController>().ReloadCharacterSetup();
+                        var actualWidth = (float)UserInterfaceManager.RootControl.PixelWidth;
+                        var setupWidth = (float)LeftSide.PixelWidth;
 
+                        if (1 - (setupWidth / actualWidth) > 0.30)
+                        {
+                            RightSide.Visible = false;
+                        }
+
+                        UserInterfaceManager.GetUIController<LobbyUIController>().ReloadRoleSetup();
+                    }
                     break;
             }
         }
@@ -62,7 +79,11 @@ namespace Content.Client.Lobby.UI
             /// <summary>
             ///  The character setup state.
             /// </summary>
-            CharacterSetup
+            CharacterSetup,
+            /// <summary>
+            /// The role preference setup state.
+            /// </summary>
+            RoleSetup
         }
     }
 }

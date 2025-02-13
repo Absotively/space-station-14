@@ -47,12 +47,20 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
 
     private CharacterSetupGui? _characterSetup;
     private HumanoidProfileEditor? _profileEditor;
-    private CharacterSetupGuiSavePanel? _savePanel;
+    private CharacterSetupGuiSavePanel? _characterSavePanel;
+    private RoleSetupGui? _roleSetup;
+    private RoleSetupGuiSavePanel? _roleSavePanel;
 
     /// <summary>
-    /// This is the characher preview panel in the chat. This should only update if their character updates.
+    /// This is the roles & characters preview panel in the chat. This should only update
+    /// if their preferences update.
     /// </summary>
-    private LobbyCharacterPreviewPanel? PreviewPanel => GetLobbyPreview();
+    private LobbyPreferencesPreviewPanel? PreviewPanel => GetLobbyPreview();
+
+    /// <summary>
+    ///This is the modified copy of the player's role preferences currently being edited.
+    /// </summary>
+    private RolePreferences? EditedRolePreferences => _roleSetup?.RolePreferences;
 
     /// <summary>
     /// This is the modified profile currently being edited.
@@ -78,11 +86,11 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
         _configurationManager.OnValueChanged(CCVars.GameRoleWhitelist, _ => RefreshProfileEditor());
     }
 
-    private LobbyCharacterPreviewPanel? GetLobbyPreview()
+    private LobbyPreferencesPreviewPanel? GetLobbyPreview()
     {
         if (_stateManager.CurrentState is LobbyState lobby)
         {
-            return lobby.Lobby?.CharacterPreview;
+            return lobby.Lobby?.PreferencesPreview;
         }
 
         return null;
@@ -90,10 +98,10 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
 
     private void OnRequirementsUpdated()
     {
-        if (_profileEditor != null)
+        if (_roleSetup != null)
         {
-            _profileEditor.RefreshAntags();
-            _profileEditor.RefreshJobs();
+            _roleSetup.RefreshAntags();
+            _roleSetup.RefreshJobs();
         }
     }
 
@@ -101,17 +109,6 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
     {
         if (_profileEditor != null)
         {
-            if (obj.WasModified<AntagPrototype>())
-            {
-                _profileEditor.RefreshAntags();
-            }
-
-            if (obj.WasModified<JobPrototype>() ||
-                obj.WasModified<DepartmentPrototype>())
-            {
-                _profileEditor.RefreshJobs();
-            }
-
             if (obj.WasModified<LoadoutPrototype>() ||
                 obj.WasModified<LoadoutGroupPrototype>() ||
                 obj.WasModified<RoleLoadoutPrototype>())
@@ -127,6 +124,20 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
             if (obj.WasModified<TraitPrototype>())
             {
                 _profileEditor.RefreshTraits();
+            }
+        }
+
+        if (_roleSetup != null)
+        {
+            if (obj.WasModified<AntagPrototype>())
+            {
+                _roleSetup.RefreshAntags();
+            }
+
+            if (obj.WasModified<JobPrototype>() ||
+                obj.WasModified<DepartmentPrototype>())
+            {
+                _roleSetup.RefreshJobs();
             }
         }
     }
@@ -152,9 +163,21 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
         PreviewPanel?.SetLoaded(false);
         _profileEditor?.Dispose();
         _characterSetup?.Dispose();
+        _roleSetup?.Dispose();
 
         _characterSetup = null;
         _profileEditor = null;
+        _roleSetup = null;
+    }
+
+    /// <summary>
+    /// Reloads every single role setup control.
+    /// </summary>
+    public void ReloadRoleSetup()
+    {
+        RefreshLobbyPreview();
+        var (characterGui, profileEditor, roleGui) = EnsureGui();
+        roleGui.Reload();
     }
 
     /// <summary>
@@ -163,10 +186,10 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
     public void ReloadCharacterSetup()
     {
         RefreshLobbyPreview();
-        var (characterGui, profileEditor) = EnsureGui();
+        var (characterGui, profileEditor, roleGui) = EnsureGui();
         characterGui.ReloadCharacterPickers();
         profileEditor.SetProfile(
-            (HumanoidCharacterProfile?) _preferencesManager.Preferences?.SelectedCharacter,
+            (HumanoidCharacterProfile?)_preferencesManager.Preferences?.SelectedCharacter,
             _preferencesManager.Preferences?.SelectedCharacterIndex);
     }
 
@@ -195,9 +218,19 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
 
     private void RefreshProfileEditor()
     {
-        _profileEditor?.RefreshAntags();
-        _profileEditor?.RefreshJobs();
+        _roleSetup?.RefreshAntags();
+        _roleSetup?.RefreshJobs();
         _profileEditor?.RefreshLoadouts();
+    }
+    private void SaveRolePreferences()
+    {
+        DebugTools.Assert(EditedRolePreferences != null);
+
+        if (EditedRolePreferences == null)
+            return;
+
+        _preferencesManager.UpdateRolePreferences(EditedRolePreferences);
+        ReloadRoleSetup();
     }
 
     private void SaveProfile()
@@ -216,6 +249,19 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
         ReloadCharacterSetup();
     }
 
+    private void CloseRoleEditor()
+    {
+        if (_roleSetup == null)
+            return;
+
+        _roleSetup.Visible = false;
+
+        if (_stateManager.CurrentState is LobbyState lobbyGui)
+        {
+            lobbyGui.SwitchState(LobbyGui.LobbyGuiState.Default);
+        }
+    }
+
     private void CloseProfileEditor()
     {
         if (_profileEditor == null)
@@ -230,39 +276,66 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
         }
     }
 
-    private void OpenSavePanel()
+    private void OpenRoleSavePanel()
     {
-        if (_savePanel is { IsOpen: true })
+        if (_characterSavePanel is { IsOpen: true })
             return;
 
-        _savePanel = new CharacterSetupGuiSavePanel();
+        _roleSavePanel = new RoleSetupGuiSavePanel();
 
-        _savePanel.SaveButton.OnPressed += _ =>
+        _roleSavePanel.SaveButton.OnPressed += _ =>
+        {
+            SaveRolePreferences();
+
+            _roleSavePanel.Close();
+
+            CloseRoleEditor();
+        };
+
+        _roleSavePanel.NoSaveButton.OnPressed += _ =>
+        {
+            _roleSavePanel.Close();
+
+            CloseRoleEditor();
+        };
+
+        _roleSavePanel.OpenCentered();
+    }
+
+    private void OpenCharacterSavePanel()
+    {
+        if (_characterSavePanel is { IsOpen: true })
+            return;
+
+        _characterSavePanel = new CharacterSetupGuiSavePanel();
+
+        _characterSavePanel.SaveButton.OnPressed += _ =>
         {
             SaveProfile();
 
-            _savePanel.Close();
+            _characterSavePanel.Close();
 
             CloseProfileEditor();
         };
 
-        _savePanel.NoSaveButton.OnPressed += _ =>
+        _characterSavePanel.NoSaveButton.OnPressed += _ =>
         {
-            _savePanel.Close();
+            _characterSavePanel.Close();
 
             CloseProfileEditor();
         };
 
-        _savePanel.OpenCentered();
+        _characterSavePanel.OpenCentered();
     }
 
-    private (CharacterSetupGui, HumanoidProfileEditor) EnsureGui()
+    private (CharacterSetupGui, HumanoidProfileEditor, RoleSetupGui) EnsureGui()
     {
-        if (_characterSetup != null && _profileEditor != null)
+        if (_characterSetup != null && _profileEditor != null && _roleSetup != null)
         {
             _characterSetup.Visible = true;
             _profileEditor.Visible = true;
-            return (_characterSetup, _profileEditor);
+            _roleSetup.Visible = true;
+            return (_characterSetup, _profileEditor, _roleSetup);
         }
 
         _profileEditor = new HumanoidProfileEditor(
@@ -286,7 +359,7 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
             // Open the save panel if we have unsaved changes.
             if (_profileEditor.Profile != null && _profileEditor.IsDirty)
             {
-                OpenSavePanel();
+                OpenCharacterSavePanel();
 
                 return;
             }
@@ -319,12 +392,37 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
             }
         };
 
+        _roleSetup = new RoleSetupGui(
+            _dialogManager,
+            _logManager,
+            _requirements
+            );
+
+        _roleSetup.OnOpenGuidebook += _guide.OpenHelp;
+
+        _roleSetup.Save += SaveRolePreferences;
+
+        _roleSetup.CloseButton.OnPressed += _ =>
+        {
+            // Open the save panel if we have unsaved changes.
+            if (_roleSetup.IsDirty)
+            {
+                OpenRoleSavePanel();
+
+                return;
+            }
+
+            // Reset sliders etc.
+            CloseRoleEditor();
+        };
+
         if (_stateManager.CurrentState is LobbyState lobby)
         {
             lobby.Lobby?.CharacterSetupState.AddChild(_characterSetup);
+            lobby.Lobby?.RoleSetupState.AddChild(_roleSetup);
         }
 
-        return (_characterSetup, _profileEditor);
+        return (_characterSetup, _profileEditor, _roleSetup);
     }
 
     #region Helpers
@@ -349,7 +447,9 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
     /// </summary>
     public JobPrototype GetPreferredJob(HumanoidCharacterProfile profile)
     {
-        var highPriorityJob = profile.JobPriorities.FirstOrDefault(p => p.Value == JobPriority.High).Key;
+        // TODO: make a "preview job" setting for profiles I guess
+        //var highPriorityJob = profile.JobPriorities.FirstOrDefault(p => p.Value == JobPriority.High).Key;
+        var highPriorityJob = (ProtoId<JobPrototype>)SharedGameTicker.FallbackOverflowJob;
         // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract (what is resharper smoking?)
         return _prototypeManager.Index<JobPrototype>(highPriorityJob.Id ?? SharedGameTicker.FallbackOverflowJob);
     }

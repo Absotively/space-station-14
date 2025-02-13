@@ -104,12 +104,12 @@ public sealed class StationJobsTest
 
         await server.WaitAssertion(() =>
         {
-            var fakePlayers = new Dictionary<NetUserId, HumanoidCharacterProfile>()
+            var fakePlayers = new Dictionary<NetUserId, RolePreferences>()
                 .AddJob("TAssistant", JobPriority.Medium, PlayerCount)
                 .AddPreference("TClown", JobPriority.Low)
                 .AddPreference("TMime", JobPriority.High)
                 .WithPlayers(
-                    new Dictionary<NetUserId, HumanoidCharacterProfile>()
+                    new Dictionary<NetUserId, RolePreferences>()
                     .AddJob("TCaptain", JobPriority.High, CaptainCount)
                 );
             Assert.That(fakePlayers, Is.Not.Empty);
@@ -251,27 +251,27 @@ public sealed class StationJobsTest
 
 internal static class JobExtensions
 {
-    public static Dictionary<NetUserId, HumanoidCharacterProfile> AddJob(
-        this Dictionary<NetUserId, HumanoidCharacterProfile> inp, string jobId, JobPriority prio = JobPriority.Medium,
+    public static Dictionary<NetUserId, RolePreferences> AddJob(
+        this Dictionary<NetUserId, RolePreferences> inp, string jobId, JobPriority prio = JobPriority.Medium,
         int amount = 1)
     {
         for (var i = 0; i < amount; i++)
         {
-            inp.Add(new NetUserId(Guid.NewGuid()), HumanoidCharacterProfile.Random().WithJobPriority(jobId, prio));
+            inp.Add(new NetUserId(Guid.NewGuid()), new RolePreferences().WithJobPriority(jobId, prio));
         }
 
         return inp;
     }
 
-    public static Dictionary<NetUserId, HumanoidCharacterProfile> AddPreference(
-        this Dictionary<NetUserId, HumanoidCharacterProfile> inp, string jobId, JobPriority prio = JobPriority.Medium)
+    public static Dictionary<NetUserId, RolePreferences> AddPreference(
+        this Dictionary<NetUserId, RolePreferences> inp, string jobId, JobPriority prio = JobPriority.Medium)
     {
         return inp.ToDictionary(x => x.Key, x => x.Value.WithJobPriority(jobId, prio));
     }
 
-    public static Dictionary<NetUserId, HumanoidCharacterProfile> WithPlayers(
-        this Dictionary<NetUserId, HumanoidCharacterProfile> inp,
-        Dictionary<NetUserId, HumanoidCharacterProfile> second)
+    public static Dictionary<NetUserId, RolePreferences> WithPlayers(
+        this Dictionary<NetUserId, RolePreferences> inp,
+        Dictionary<NetUserId, RolePreferences> second)
     {
         return new[] { inp, second }.SelectMany(x => x).ToDictionary(x => x.Key, x => x.Value);
     }

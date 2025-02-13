@@ -58,8 +58,9 @@
                     </BoxContainer>
                 </Control>
                 <!-- Character setup state -->
-                <!-- This is injected on startup. Funky! -->
+                <!-- These are injected on startup. Funky! -->
                 <Control Access="Public" Visible="False" Name="CharacterSetupState" VerticalExpand="True" />
+                <Control Access="Public" Visible="False" Name="RoleSetupState" VerticalExpand="True" />
             </BoxContainer>
             <!-- Right Panel -->
             <PanelContainer Name="RightSide" Access="Public" StyleClasses="AngleRect" HorizontalAlignment="Right" VerticalExpand="True"
@@ -92,7 +93,7 @@
                     <Label Name="StationTime" Access="Public" FontColorOverride="{x:Static maths:Color.LightGray}"
                            Margin="3 3 3 3" HorizontalAlignment="Left" />
                     <controls:HSpacer Spacing="5" />
-                    <lobbyUi:LobbyCharacterPreviewPanel Name="CharacterPreview" Access="Public" />
+                    <lobbyUi:LobbyPreferencesPreviewPanel Name="PreferencesPreview" Access="Public" />
                     <controls:HSpacer Spacing="5" />
                     <BoxContainer MinHeight="10" />
                     <!-- Gold line -->

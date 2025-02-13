@@ -86,8 +86,6 @@ namespace Content.Client.Lobby.UI
 
         private List<SpeciesPrototype> _species = new();
 
-        private List<(string, RequirementsSelector)> _jobPriorities = new();
-
         private readonly Dictionary<string, BoxContainer> _jobCategories;
 
         private Direction _previewRotation = Direction.North;
@@ -374,37 +372,18 @@ namespace Content.Client.Lobby.UI
 
             #region Jobs
 
-            TabContainer.SetTabTitle(1, Loc.GetString("humanoid-profile-editor-jobs-tab"));
-
-            PreferenceUnavailableButton.AddItem(
-                Loc.GetString("humanoid-profile-editor-preference-unavailable-stay-in-lobby-button"),
-                (int) PreferenceUnavailableMode.StayInLobby);
-            PreferenceUnavailableButton.AddItem(
-                Loc.GetString("humanoid-profile-editor-preference-unavailable-spawn-as-overflow-button",
-                              ("overflowJob", Loc.GetString(SharedGameTicker.FallbackOverflowJobName))),
-                (int) PreferenceUnavailableMode.SpawnAsOverflow);
-
-            PreferenceUnavailableButton.OnItemSelected += args =>
-            {
-                PreferenceUnavailableButton.SelectId(args.Id);
-                Profile = Profile?.WithPreferenceUnavailable((PreferenceUnavailableMode) args.Id);
-                SetDirty();
-            };
+            TabContainer.SetTabTitle(1, Loc.GetString("humanoid-profile-editor-job-loadouts-tab"));
 
             _jobCategories = new Dictionary<string, BoxContainer>();
 
-            RefreshAntags();
             RefreshJobs();
-
             #endregion Jobs
-
-            TabContainer.SetTabTitle(2, Loc.GetString("humanoid-profile-editor-antags-tab"));
 
             RefreshTraits();
 
             #region Markings
 
-            TabContainer.SetTabTitle(4, Loc.GetString("humanoid-profile-editor-markings-tab"));
+            TabContainer.SetTabTitle(3, Loc.GetString("humanoid-profile-editor-markings-tab"));
 
             Markings.OnMarkingAdded += OnMarkingChange;
             Markings.OnMarkingRemoved += OnMarkingChange;
@@ -482,7 +461,7 @@ namespace Content.Client.Lobby.UI
             TraitsList.DisposeAllChildren();
 
             var traits = _prototypeManager.EnumeratePrototypes<TraitPrototype>().OrderBy(t => Loc.GetString(t.Name)).ToList();
-            TabContainer.SetTabTitle(3, Loc.GetString("humanoid-profile-editor-traits-tab"));
+            TabContainer.SetTabTitle(2, Loc.GetString("humanoid-profile-editor-traits-tab"));
 
             if (traits.Count < 1)
             {
@@ -617,69 +596,6 @@ namespace Content.Client.Lobby.UI
                 }
             }
         }
-
-        public void RefreshAntags()
-        {
-            AntagList.DisposeAllChildren();
-            var items = new[]
-            {
-                ("humanoid-profile-editor-antag-preference-yes-button", 0),
-                ("humanoid-profile-editor-antag-preference-no-button", 1)
-            };
-
-            foreach (var antag in _prototypeManager.EnumeratePrototypes<AntagPrototype>().OrderBy(a => Loc.GetString(a.Name)))
-            {
-                if (!antag.SetPreference)
-                    continue;
-
-                var antagContainer = new BoxContainer()
-                {
-                    Orientation = LayoutOrientation.Horizontal,
-                };
-
-                var selector = new RequirementsSelector()
-                {
-                    Margin = new Thickness(3f, 3f, 3f, 0f),
-                };
-                selector.OnOpenGuidebook += OnOpenGuidebook;
-
-                var title = Loc.GetString(antag.Name);
-                var description = Loc.GetString(antag.Objective);
-                selector.Setup(items, title, 250, description, guides: antag.Guides);
-                selector.Select(Profile?.AntagPreferences.Contains(antag.ID) == true ? 0 : 1);
-
-                var requirements = _entManager.System<SharedRoleSystem>().GetAntagRequirement(antag);
-                if (!_requirements.CheckRoleRequirements(requirements, (HumanoidCharacterProfile?)_preferencesManager.Preferences?.SelectedCharacter, out var reason))
-                {
-                    selector.LockRequirements(reason);
-                    Profile = Profile?.WithAntagPreference(antag.ID, false);
-                    SetDirty();
-                }
-                else
-                {
-                    selector.UnlockRequirements();
-                }
-
-                selector.OnSelected += preference =>
-                {
-                    Profile = Profile?.WithAntagPreference(antag.ID, preference == 0);
-                    SetDirty();
-                };
-
-                antagContainer.AddChild(selector);
-
-                antagContainer.AddChild(new Button()
-                {
-                    Disabled = true,
-                    Text = Loc.GetString("loadout-window"),
-                    HorizontalAlignment = HAlignment.Right,
-                    Margin = new Thickness(3f, 0f, 0f, 0f),
-                });
-
-                AntagList.AddChild(antagContainer);
-            }
-        }
-
         private void SetDirty()
         {
             // If it equals default then reset the button.
@@ -757,18 +673,12 @@ namespace Content.Client.Lobby.UI
             UpdateCMarkingsHair();
             UpdateCMarkingsFacialHair();
 
-            RefreshAntags();
             RefreshJobs();
             RefreshLoadouts();
             RefreshSpecies();
             RefreshTraits();
             RefreshFlavorText();
             ReloadPreview();
-
-            if (Profile != null)
-            {
-                PreferenceUnavailableButton.SelectId((int) Profile.PreferenceUnavailable);
-            }
         }
 
 
@@ -807,14 +717,15 @@ namespace Content.Client.Lobby.UI
             }
         }
 
+
+
         /// <summary>
-        /// Refreshes all job selectors.
+        /// Refreshes all job loadout controls.
         /// </summary>
         public void RefreshJobs()
         {
             JobList.DisposeAllChildren();
             _jobCategories.Clear();
-            _jobPriorities.Clear();
             var firstCategory = true;
 
             // Get all displayed departments
@@ -828,14 +739,6 @@ namespace Content.Client.Lobby.UI
             }
 
             departments.Sort(DepartmentUIComparer.Instance);
-
-            var items = new[]
-            {
-                ("humanoid-profile-editor-job-priority-never-button", (int) JobPriority.Never),
-                ("humanoid-profile-editor-job-priority-low-button", (int) JobPriority.Low),
-                ("humanoid-profile-editor-job-priority-medium-button", (int) JobPriority.Medium),
-                ("humanoid-profile-editor-job-priority-high-button", (int) JobPriority.High),
-            };
 
             foreach (var department in departments)
             {
@@ -865,7 +768,7 @@ namespace Content.Client.Lobby.UI
 
                     category.AddChild(new PanelContainer
                     {
-                        PanelOverride = new StyleBoxFlat {BackgroundColor = Color.FromHex("#464966")},
+                        PanelOverride = new StyleBoxFlat { BackgroundColor = Color.FromHex("#464966") },
                         Children =
                         {
                             new Label
@@ -894,11 +797,11 @@ namespace Content.Client.Lobby.UI
                         Orientation = LayoutOrientation.Horizontal,
                     };
 
-                    var selector = new RequirementsSelector()
+                    var loadoutControl = new LoadoutControl()
                     {
                         Margin = new Thickness(3f, 3f, 3f, 0f),
                     };
-                    selector.OnOpenGuidebook += OnOpenGuidebook;
+                    loadoutControl.OnOpenGuidebook += OnOpenGuidebook;
 
                     var icon = new TextureRect
                     {
@@ -907,45 +810,7 @@ namespace Content.Client.Lobby.UI
                     };
                     var jobIcon = _prototypeManager.Index(job.Icon);
                     icon.Texture = jobIcon.Icon.Frame0();
-                    selector.Setup(items, job.LocalizedName, 200, job.LocalizedDescription, icon, job.Guides);
-
-                    if (!_requirements.IsAllowed(job, (HumanoidCharacterProfile?)_preferencesManager.Preferences?.SelectedCharacter, out var reason))
-                    {
-                        selector.LockRequirements(reason);
-                    }
-                    else
-                    {
-                        selector.UnlockRequirements();
-                    }
-
-                    selector.OnSelected += selectedPrio =>
-                    {
-                        var selectedJobPrio = (JobPriority) selectedPrio;
-                        Profile = Profile?.WithJobPriority(job.ID, selectedJobPrio);
-
-                        foreach (var (jobId, other) in _jobPriorities)
-                        {
-                            // Sync other selectors with the same job in case of multiple department jobs
-                            if (jobId == job.ID)
-                            {
-                                other.Select(selectedPrio);
-                                continue;
-                            }
-
-                            if (selectedJobPrio != JobPriority.High || (JobPriority) other.Selected != JobPriority.High)
-                                continue;
-
-                            // Lower any other high priorities to medium.
-                            other.Select((int)JobPriority.Medium);
-                            Profile = Profile?.WithJobPriority(jobId, JobPriority.Medium);
-                        }
-
-                        // TODO: Only reload on high change (either to or from).
-                        ReloadPreview();
-
-                        UpdateJobPriorities();
-                        SetDirty();
-                    };
+                    loadoutControl.Setup(job.LocalizedName, 200, job.LocalizedDescription, icon, job.Guides);
 
                     var loadoutWindowBtn = new Button()
                     {
@@ -961,12 +826,12 @@ namespace Content.Client.Lobby.UI
                     // If no loadout found then disabled button
                     if (!protoManager.TryIndex<RoleLoadoutPrototype>(LoadoutSystem.GetJobPrototype(job.ID), out var roleLoadoutProto))
                     {
-                        loadoutWindowBtn.Disabled = true;
+                        loadoutControl.LoadoutButton.Disabled = true;
                     }
                     // else
                     else
                     {
-                        loadoutWindowBtn.OnPressed += args =>
+                        loadoutControl.LoadoutButton.OnPressed += args =>
                         {
                             RoleLoadout? loadout = null;
 
@@ -984,16 +849,11 @@ namespace Content.Client.Lobby.UI
                         };
                     }
 
-                    _jobPriorities.Add((job.ID, selector));
-                    jobContainer.AddChild(selector);
-                    jobContainer.AddChild(loadoutWindowBtn);
+                    jobContainer.AddChild(loadoutControl);
                     category.AddChild(jobContainer);
                 }
             }
-
-            UpdateJobPriorities();
         }
-
         private void OpenLoadout(JobPrototype? jobProto, RoleLoadout roleLoadout, RoleLoadoutPrototype roleLoadoutProto)
         {
             _loadoutWindow?.Dispose();
@@ -1042,8 +902,6 @@ namespace Content.Client.Lobby.UI
 
             if (Profile is null)
                 return;
-
-            UpdateJobPriorities();
         }
 
         private void OnFlavorTextChange(string content)
@@ -1248,18 +1106,6 @@ namespace Content.Client.Lobby.UI
         private void UpdateAgeEdit()
         {
             AgeEdit.Text = Profile?.Age.ToString() ?? "";
-        }
-
-        /// <summary>
-        /// Updates selected job priorities to the profile's.
-        /// </summary>
-        private void UpdateJobPriorities()
-        {
-            foreach (var (jobId, prioritySelector) in _jobPriorities)
-            {
-                var priority = Profile?.JobPriorities.GetValueOrDefault(jobId, JobPriority.Never) ?? JobPriority.Never;
-                prioritySelector.Select((int) priority);
-            }
         }
 
         private void UpdateSexControls()

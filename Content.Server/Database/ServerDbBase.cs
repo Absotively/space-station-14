@@ -45,8 +45,8 @@ namespace Content.Server.Database
 
             var prefs = await db.DbContext
                 .Preference
-                .Include(p => p.Profiles).ThenInclude(h => h.Jobs)
-                .Include(p => p.Profiles).ThenInclude(h => h.Antags)
+                .Include(p => p.Jobs)
+                .Include(p => p.Antags)
                 .Include(p => p.Profiles).ThenInclude(h => h.Traits)
                 .Include(p => p.Profiles)
                     .ThenInclude(h => h.Loadouts)
@@ -64,8 +64,16 @@ namespace Content.Server.Database
             {
                 profiles[profile.Slot] = ConvertProfiles(profile);
             }
+            var jobs = prefs.Jobs.ToDictionary(j => new ProtoId<JobPrototype>(j.JobName), j => (JobPriority)j.Priority);
+            var antags = prefs.Antags.Select(a => new ProtoId<AntagPrototype>(a.AntagName));
+            var prefUnavailable = prefs.PreferenceUnavailable;
+            var rolePrefs = new RolePreferences(jobs, antags.ToHashSet(), (PreferenceUnavailableMode)prefUnavailable);
 
-            return new PlayerPreferences(profiles, prefs.SelectedCharacterSlot, Color.FromHex(prefs.AdminOOCColor));
+            return new PlayerPreferences(
+                profiles,
+                prefs.SelectedCharacterSlot,
+                Color.FromHex(prefs.AdminOOCColor),
+                rolePrefs);
         }
 
         public async Task SaveSelectedCharacterIndexAsync(NetUserId userId, int index)
@@ -97,8 +105,6 @@ namespace Content.Server.Database
             var oldProfile = db.DbContext.Profile
                 .Include(p => p.Preference)
                 .Where(p => p.Preference.UserId == userId.UserId)
-                .Include(p => p.Jobs)
-                .Include(p => p.Antags)
                 .Include(p => p.Traits)
                 .Include(p => p.Loadouts)
                     .ThenInclude(l => l.Groups)
@@ -152,7 +158,11 @@ namespace Content.Server.Database
 
             await db.DbContext.SaveChangesAsync();
 
-            return new PlayerPreferences(new[] {new KeyValuePair<int, ICharacterProfile>(0, defaultProfile)}, 0, Color.FromHex(prefs.AdminOOCColor));
+            return new PlayerPreferences(
+                new[] {new KeyValuePair<int, ICharacterProfile>(0, defaultProfile)},
+                0,
+                Color.FromHex(prefs.AdminOOCColor),
+                new RolePreferences());
         }
 
         public async Task DeleteSlotAndSetSelectedIndex(NetUserId userId, int deleteSlot, int newSlot)
@@ -175,8 +185,34 @@ namespace Content.Server.Database
             prefs.AdminOOCColor = color.ToHex();
 
             await db.DbContext.SaveChangesAsync();
-
         }
+
+        public async Task SaveRolePreferencesAsync(NetUserId userId, IRolePreferences rolePreferences)
+        {
+            await using var db = await GetDb();
+            var prefs = await db.DbContext
+                .Preference
+                .Include(p => p.Jobs)
+                .Include(p => p.Antags)
+                .SingleAsync(p => p.UserId == userId.UserId);
+            prefs.PreferenceUnavailable = (DbPreferenceUnavailableMode)rolePreferences.PreferenceUnavailable;
+
+            prefs.Jobs.Clear();
+            prefs.Jobs.AddRange(
+                rolePreferences.JobPriorities
+                    .Where(j => j.Value != JobPriority.Never)
+                    .Select(j => new Job { JobName = j.Key, Priority = (DbJobPriority)j.Value })
+            );
+
+            prefs.Antags.Clear();
+            prefs.Antags.AddRange(
+                rolePreferences.AntagPreferences
+                    .Select(a => new Antag { AntagName = a })
+            );
+
+            await db.DbContext.SaveChangesAsync();
+        }
+        
 
         private static async Task SetSelectedCharacterSlotAsync(NetUserId userId, int newSlot, ServerDbContext db)
         {
@@ -186,8 +222,6 @@ namespace Content.Server.Database
 
         private static HumanoidCharacterProfile ConvertProfiles(Profile profile)
         {
-            var jobs = profile.Jobs.ToDictionary(j => new ProtoId<JobPrototype>(j.JobName), j => (JobPriority) j.Priority);
-            var antags = profile.Antags.Select(a => new ProtoId<AntagPrototype>(a.AntagName));
             var traits = profile.Traits.Select(t => new ProtoId<TraitPrototype>(t.TraitName));
 
             var sex = Sex.Male;
@@ -257,9 +291,6 @@ namespace Content.Server.Database
                     markings
                 ),
                 spawnPriority,
-                jobs,
-                (PreferenceUnavailableMode) profile.PreferenceUnavailable,
-                antags.ToHashSet(),
                 traits.ToHashSet(),
                 loadouts
             );
@@ -291,20 +322,6 @@ namespace Content.Server.Database
             profile.SpawnPriority = (int) humanoid.SpawnPriority;
             profile.Markings = markings;
             profile.Slot = slot;
-            profile.PreferenceUnavailable = (DbPreferenceUnavailableMode) humanoid.PreferenceUnavailable;
-
-            profile.Jobs.Clear();
-            profile.Jobs.AddRange(
-                humanoid.JobPriorities
-                    .Where(j => j.Value != JobPriority.Never)
-                    .Select(j => new Job {JobName = j.Key, Priority = (DbJobPriority) j.Value})
-            );
-
-            profile.Antags.Clear();
-            profile.Antags.AddRange(
-                humanoid.AntagPreferences
-                    .Select(a => new Antag {AntagName = a})
-            );
 
             profile.Traits.Clear();
             profile.Traits.AddRange(

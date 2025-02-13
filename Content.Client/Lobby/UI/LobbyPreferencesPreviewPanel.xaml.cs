@@ -9,15 +9,18 @@ using Robust.Client.UserInterface.XAML;
 namespace Content.Client.Lobby.UI;
 
 [GenerateTypedNameReferences]
-public sealed partial class LobbyCharacterPreviewPanel : Control
+public sealed partial class LobbyPreferencesPreviewPanel : Control
 {
     [Dependency] private readonly IEntityManager _entManager = default!;
 
+    public Button RoleSetupButton => RoleSetup;
+
     public Button CharacterSetupButton => CharacterSetup;
+
 
     private EntityUid? _previewDummy;
 
-    public LobbyCharacterPreviewPanel()
+    public LobbyPreferencesPreviewPanel()
     {
         RobustXamlLoader.Load(this);
         IoCManager.InjectDependencies(this);

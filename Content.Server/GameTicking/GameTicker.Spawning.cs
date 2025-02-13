@@ -59,6 +59,7 @@ namespace Content.Server.GameTicking
 
         private void SpawnPlayers(List<ICommonSession> readyPlayers,
             Dictionary<NetUserId, HumanoidCharacterProfile> profiles,
+            Dictionary<NetUserId, RolePreferences> rolePreferences,
             bool force)
         {
             // Allow game rules to spawn players by themselves if needed. (For example, nuke ops or wizard)
@@ -87,9 +88,9 @@ namespace Content.Server.GameTicking
             }
 
             var spawnableStations = GetSpawnableStations();
-            var assignedJobs = _stationJobs.AssignJobs(profiles, spawnableStations);
+            var assignedJobs = _stationJobs.AssignJobs(rolePreferences, spawnableStations);
 
-            _stationJobs.AssignOverflowJobs(ref assignedJobs, playerNetIds, profiles, spawnableStations);
+            _stationJobs.AssignOverflowJobs(ref assignedJobs, playerNetIds, rolePreferences, spawnableStations);
 
             // Calculate extended access for stations.
             var stationJobCounts = spawnableStations.ToDictionary(e => e, _ => 0);
@@ -197,10 +198,18 @@ namespace Content.Server.GameTicking
                 restrictedRoles.UnionWith(jobBans);
 
             // Pick best job best on prefs.
-            jobId ??= _stationJobs.PickBestAvailableJobWithPriority(station,
-                character.JobPriorities,
-                true,
-                restrictedRoles);
+            if (jobId is null)
+            {
+                var jobPriorities = new RolePreferences();
+                if (_prefsManager.TryGetCachedPreferences(player.UserId, out var preferences))
+                {
+                    jobPriorities = preferences.RolePreferences;
+                }
+                jobId = _stationJobs.PickBestAvailableJobWithPriority(station,
+                    jobPriorities,
+                    true,
+                    restrictedRoles);
+            }
             // If no job available, stay in lobby, or if no lobby spawn as observer
             if (jobId is null)
             {

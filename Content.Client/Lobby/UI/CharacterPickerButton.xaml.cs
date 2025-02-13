@@ -1,6 +1,7 @@
 using System.Linq;
 using Content.Client.Humanoid;
 using Content.Shared.Clothing;
+using Content.Shared.GameTicking;
 using Content.Shared.Humanoid;
 using Content.Shared.Humanoid.Prototypes;
 using Content.Shared.Preferences;
@@ -52,7 +53,8 @@ public sealed partial class CharacterPickerButton : ContainerButton
             _previewDummy = UserInterfaceManager.GetUIController<LobbyUIController>()
                 .LoadProfileEntity(humanoid, null, true);
 
-            var highPriorityJob = humanoid.JobPriorities.SingleOrDefault(p => p.Value == JobPriority.High).Key;
+            // TODO: preview job for profiles
+            var highPriorityJob = (ProtoId<JobPrototype>)SharedGameTicker.FallbackOverflowJob;
             if (highPriorityJob != default)
             {
                 var jobName = prototypeManager.Index(highPriorityJob).LocalizedName;

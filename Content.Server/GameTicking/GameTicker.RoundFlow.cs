@@ -11,6 +11,7 @@ using Content.Shared.GameTicking;
 using Content.Shared.Mind;
 using Content.Shared.Players;
 using Content.Shared.Preferences;
+using Content.Shared.Roles;
 using JetBrains.Annotations;
 using Prometheus;
 using Robust.Server.Maps;
@@ -19,6 +20,7 @@ using Robust.Shared.Audio;
 using Robust.Shared.Map;
 using Robust.Shared.Network;
 using Robust.Shared.Player;
+using Robust.Shared.Prototypes;
 using Robust.Shared.Random;
 using Robust.Shared.Utility;
 
@@ -222,6 +224,7 @@ namespace Content.Server.GameTicking
 
             var readyPlayers = new List<ICommonSession>();
             var readyPlayerProfiles = new Dictionary<NetUserId, HumanoidCharacterProfile>();
+            var readyPlayerRolePreferences = new Dictionary<NetUserId, RolePreferences>();
             var autoDeAdmin = _cfg.GetCVar(CCVars.AdminDeadminOnJoin);
             foreach (var (userId, status) in _playerGameStatuses)
             {
@@ -241,10 +244,12 @@ namespace Content.Server.GameTicking
                 if (_prefsManager.TryGetCachedPreferences(userId, out var preferences))
                 {
                     profile = (HumanoidCharacterProfile) preferences.SelectedCharacter;
+                    readyPlayerRolePreferences.Add(userId, preferences.RolePreferences);
                 }
                 else
                 {
                     profile = HumanoidCharacterProfile.Random();
+                    readyPlayerRolePreferences.Add(userId, new RolePreferences());
                 }
                 readyPlayerProfiles.Add(userId, profile);
             }
@@ -276,7 +281,7 @@ namespace Content.Server.GameTicking
             // MapInitialize *before* spawning players, our codebase is too shit to do it afterwards...
             _mapManager.DoMapInitialize(DefaultMap);
 
-            SpawnPlayers(readyPlayers, readyPlayerProfiles, force);
+            SpawnPlayers(readyPlayers, readyPlayerProfiles, readyPlayerRolePreferences, force);
 
             _roundStartDateTime = DateTime.UtcNow;
             RunLevel = GameRunLevel.InRound;
