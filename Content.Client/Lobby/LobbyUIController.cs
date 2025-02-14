@@ -149,12 +149,14 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
         if (_stateManager.CurrentState is not LobbyState)
             return;
 
+        ReloadRoleSetup();
         ReloadCharacterSetup();
     }
 
     public void OnStateEntered(LobbyState state)
     {
         PreviewPanel?.SetLoaded(_preferencesManager.ServerDataLoaded);
+        ReloadRoleSetup();
         ReloadCharacterSetup();
     }
 
