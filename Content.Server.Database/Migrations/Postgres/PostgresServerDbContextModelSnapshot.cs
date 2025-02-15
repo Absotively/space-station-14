@@ -879,6 +879,10 @@ namespace Content.Server.Database.Migrations.Postgres
                         .HasColumnType("integer")
                         .HasColumnName("preference_id");
 
+                    b.Property<int?>("PreviewLoadoutId")
+                        .HasColumnType("integer")
+                        .HasColumnName("preview_loadout_id");
+
                     b.Property<string>("Sex")
                         .IsRequired()
                         .HasColumnType("text")
@@ -907,6 +911,9 @@ namespace Content.Server.Database.Migrations.Postgres
 
                     b.HasIndex("PreferenceId")
                         .HasDatabaseName("IX_profile_preference_id");
+
+                    b.HasIndex("PreviewLoadoutId")
+                        .IsUnique();
 
                     b.HasIndex("Slot", "PreferenceId")
                         .IsUnique();
@@ -1743,7 +1750,15 @@ namespace Content.Server.Database.Migrations.Postgres
                         .IsRequired()
                         .HasConstraintName("FK_profile_preference_preference_id");
 
+                    b.HasOne("Content.Server.Database.ProfileRoleLoadout", "PreviewLoadout")
+                        .WithOne()
+                        .HasForeignKey("Content.Server.Database.Profile", "PreviewLoadoutId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_profile_profile_role_loadout_preview_loadout_id1");
+
                     b.Navigation("Preference");
+
+                    b.Navigation("PreviewLoadout");
                 });
 
             modelBuilder.Entity("Content.Server.Database.ProfileLoadout", b =>

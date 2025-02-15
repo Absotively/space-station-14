@@ -57,6 +57,12 @@ namespace Content.Server.Database
                 .HasIndex(p => new {p.Slot, PrefsId = p.PreferenceId})
                 .IsUnique();
 
+            modelBuilder.Entity<Profile>()
+                .HasOne(p => p.PreviewLoadout)
+                .WithOne()
+                .HasForeignKey<Profile>(p => p.PreviewLoadoutId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<Antag>()
                 .HasIndex(p => new {p.PreferenceId, p.AntagName})
                 .IsUnique();
@@ -419,6 +425,8 @@ namespace Content.Server.Database
         public List<Trait> Traits { get; } = new();
 
         public List<ProfileRoleLoadout> Loadouts { get; } = new();
+        public int? PreviewLoadoutId { get; set; }
+        public ProfileRoleLoadout? PreviewLoadout { get; set; } = null;
 
         public int PreferenceId { get; set; }
         public Preference Preference { get; set; } = null!;

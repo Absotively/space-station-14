@@ -2,19 +2,51 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Content.Server.Database.Migrations.Sqlite
+namespace Content.Server.Database.Migrations.Postgres
 {
     /// <inheritdoc />
-    public partial class MoveRoleOptionsFromProfiles : Migration
+    public partial class MoveRolePreferencesFromProfiles : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<int>(
+                name: "preview_loadout_id",
+                table: "profile",
+                type: "integer",
+                nullable: true);
+
+            /* Set each character's preview loadout, to be used in things like the nice list of characters 
+             * at the side of the character setup gui, to its high-priority job, if it has one. */
+            migrationBuilder.Sql(@"
+UPDATE profile
+  SET preview_loadout_id = profile_role_loadout_id
+  FROM job, profile_role_loadout
+  WHERE job.profile_id = profile.profile_id
+    AND job.priority = 3
+    AND profile_role_loadout.profile_id = profile.profile_id
+    AND profile_role_loadout.role_name = 'Job' || job.job_name;
+");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_profile_preview_loadout_id",
+                table: "profile",
+                column: "preview_loadout_id",
+                unique: true);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_profile_profile_role_loadout_preview_loadout_id1",
+                table: "profile",
+                column: "preview_loadout_id",
+                principalTable: "profile_role_loadout",
+                principalColumn: "profile_role_loadout_id",
+                onDelete: ReferentialAction.SetNull);
+
             /* For each player, keep the highest priority from any profile for each job,
              * treating High priority as Medium */
             migrationBuilder.Sql(@"
 CREATE TEMP TABLE preference_job_temp
-AS SELECT preference_id, job_name, min(2, max(priority)) priority
+AS SELECT preference_id, job_name, LEAST(2, max(priority)) priority
   FROM job
     JOIN profile ON job.profile_id = profile.profile_id
   GROUP BY preference_id, job_name;
@@ -62,12 +94,10 @@ UPDATE preference_job_temp
                 principalColumn: "preference_id",
                 onDelete: ReferentialAction.Cascade);
 
-            migrationBuilder.Sql("PRAGMA foreign_keys=OFF;", suppressTransaction: true);
             migrationBuilder.Sql(@"
 INSERT INTO job(preference_id, job_name, priority)
 SELECT preference_id, job_name, priority FROM preference_job_temp;
 ");
-            migrationBuilder.Sql("PRAGMA foreign_keys=ON;", suppressTransaction: true);
 
             migrationBuilder.Sql("DROP TABLE preference_job_temp;");
 
@@ -103,19 +133,17 @@ AS SELECT DISTINCT preference_id, antag_name
                 principalColumn: "preference_id",
                 onDelete: ReferentialAction.Cascade);
 
-            migrationBuilder.Sql("PRAGMA foreign_keys=OFF;", suppressTransaction: true);
             migrationBuilder.Sql(@"
 INSERT INTO antag(preference_id, antag_name)
 SELECT preference_id, antag_name FROM preference_antag_temp;
 ");
-            migrationBuilder.Sql("PRAGMA foreign_keys=ON;", suppressTransaction: true);
 
             migrationBuilder.Sql("DROP TABLE preference_antag_temp;");
 
             migrationBuilder.AddColumn<int>(
                 name: "pref_unavailable",
                 table: "preference",
-                type: "INTEGER",
+                type: "integer",
                 nullable: false,
                 defaultValue: 0);
 
@@ -136,15 +164,22 @@ UPDATE preference
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            /* For lack of better ideas, copy each preference's role options to each
-             * of its profiles */
+            /* Copy each preference's role priorities to each of its profiles,
+             * treating high as medium, and also make high priority from
+             * preview loadout roles */
 
             migrationBuilder.Sql(@"
 CREATE TEMP TABLE profile_job_temp
-AS SELECT profile_id, job_name, priority
-  FROM job
-    JOIN preference ON job.preference_id = preference.preference_id
-    JOIN profile ON profile.preference_id = preference.preference_id;
+AS SELECT
+  profile.profile_id,
+  coalesce(job.job_name, substring(loadout.role_name FROM 4)) AS job_name,
+  CASE WHEN loadout.profile_role_loadout_id IS NOT NULL THEN 3 ELSE LEAST(2, job.priority) END AS priority
+
+  FROM preference
+    JOIN profile ON profile.preference_id = preference.preference_id
+    JOIN job ON job.preference_id = preference.preference_id
+    LEFT JOIN profile_role_loadout loadout ON profile.preview_loadout_id = loadout.profile_role_loadout_id
+      AND loadout.role_name = 'Job' || job.job_name;
 ");
 
             migrationBuilder.Sql("DELETE FROM job;");
@@ -176,12 +211,10 @@ AS SELECT profile_id, job_name, priority
                 principalColumn: "profile_id",
                 onDelete: ReferentialAction.Cascade);
 
-            migrationBuilder.Sql("PRAGMA foreign_keys=OFF;", suppressTransaction: true);
             migrationBuilder.Sql(@"
 INSERT INTO job(profile_id, job_name, priority)
 SELECT profile_id, job_name, priority FROM profile_job_temp;
 ");
-            migrationBuilder.Sql("PRAGMA foreign_keys=ON;", suppressTransaction: true);
 
             migrationBuilder.Sql("DROP TABLE profile_job_temp;");
 
@@ -217,19 +250,17 @@ AS SELECT profile_id, antag_name
                 principalColumn: "profile_id",
                 onDelete: ReferentialAction.Cascade);
 
-            migrationBuilder.Sql("PRAGMA foreign_keys=OFF;", suppressTransaction: true);
             migrationBuilder.Sql(@"
 INSERT INTO antag(profile_id, antag_name)
 SELECT profile_id, antag_name FROM profile_antag_temp;
 ");
-            migrationBuilder.Sql("PRAGMA foreign_keys=ON;", suppressTransaction: true);
 
             migrationBuilder.Sql("DROP TABLE profile_antag_temp;");
 
             migrationBuilder.AddColumn<int>(
                 name: "pref_unavailable",
                 table: "profile",
-                type: "INTEGER",
+                type: "integer",
                 nullable: false,
                 defaultValue: 0);
 
@@ -243,6 +274,18 @@ UPDATE profile
             migrationBuilder.DropColumn(
                 name: "pref_unavailable",
                 table: "preference");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_profile_profile_role_loadout_preview_loadout_id1",
+                table: "profile");
+
+            migrationBuilder.DropIndex(
+                name: "IX_profile_preview_loadout_id",
+                table: "profile");
+
+            migrationBuilder.DropColumn(
+                name: "preview_loadout_id",
+                table: "profile");
         }
     }
 }
