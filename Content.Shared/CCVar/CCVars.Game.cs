@@ -1,4 +1,4 @@
-﻿using Content.Shared.Roles;
+using Content.Shared.Roles;
 using Robust.Shared.Configuration;
 
 namespace Content.Shared.CCVar;
@@ -391,5 +391,8 @@ public sealed partial class CCVars
         /// </summary>
         public static readonly CVarDef<bool> GameHostnameInTitlebar =
             CVarDef.Create("game.hostname_in_titlebar", true, CVar.SERVER | CVar.REPLICATED);
+
+        public static readonly CVarDef<bool> MultipleCharacterSelection =
+            CVarDef.Create("game.multiple_character_selection", false, CVar.SERVER | CVar.REPLICATED);
 
 }
