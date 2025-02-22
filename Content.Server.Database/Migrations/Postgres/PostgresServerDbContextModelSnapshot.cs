@@ -797,6 +797,10 @@ namespace Content.Server.Database.Migrations.Postgres
                         .HasColumnType("text")
                         .HasColumnName("admin_ooc_color");
 
+                    b.Property<string>("HighestPriorityJob")
+                        .HasColumnType("text")
+                        .HasColumnName("highest_priority_job");
+
                     b.Property<int>("SelectedCharacterSlot")
                         .HasColumnType("integer")
                         .HasColumnName("selected_character_slot");
@@ -878,6 +882,10 @@ namespace Content.Server.Database.Migrations.Postgres
                     b.Property<int>("PreferenceUnavailable")
                         .HasColumnType("integer")
                         .HasColumnName("pref_unavailable");
+
+                    b.Property<bool>("RoundStartCandidate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("round_start_candidate");
 
                     b.Property<string>("Sex")
                         .IsRequired()

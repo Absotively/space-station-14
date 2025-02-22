@@ -393,6 +393,7 @@ namespace Content.Server.Database
         public int SelectedCharacterSlot { get; set; }
         public string AdminOOCColor { get; set; } = null!;
         public List<Profile> Profiles { get; } = new();
+        public string? HighestPriorityJob { get; set; } = null!;
     }
 
     public class Profile
@@ -423,6 +424,7 @@ namespace Content.Server.Database
 
         public int PreferenceId { get; set; }
         public Preference Preference { get; set; } = null!;
+        public bool RoundStartCandidate { get; set; }
     }
 
     public class Job
