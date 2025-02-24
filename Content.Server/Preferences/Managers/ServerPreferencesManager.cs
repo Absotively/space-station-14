@@ -68,7 +68,7 @@ namespace Content.Server.Preferences.Managers
                 return;
             }
 
-            prefsData.Prefs = new PlayerPreferences(curPrefs.Characters, index, curPrefs.AdminOOCColor);
+            prefsData.Prefs = new PlayerPreferences(curPrefs.Characters, index, curPrefs.AdminOOCColor, curPrefs.HighestPriorityJob);
 
             if (ShouldStorePrefs(message.MsgChannel.AuthType))
             {
@@ -108,7 +108,7 @@ namespace Content.Server.Preferences.Managers
                 [slot] = profile
             };
 
-            prefsData.Prefs = new PlayerPreferences(profiles, slot, curPrefs.AdminOOCColor);
+            prefsData.Prefs = new PlayerPreferences(profiles, curPrefs.SelectedCharacterIndex, curPrefs.AdminOOCColor, curPrefs.HighestPriorityJob);
 
             if (ShouldStorePrefs(session.Channel.AuthType))
                 await _db.SaveCharacterSlotAsync(userId, profile, slot);
@@ -151,7 +151,7 @@ namespace Content.Server.Preferences.Managers
             var arr = new Dictionary<int, ICharacterProfile>(curPrefs.Characters);
             arr.Remove(slot);
 
-            prefsData.Prefs = new PlayerPreferences(arr, nextSlot ?? curPrefs.SelectedCharacterIndex, curPrefs.AdminOOCColor);
+            prefsData.Prefs = new PlayerPreferences(arr, nextSlot ?? curPrefs.SelectedCharacterIndex, curPrefs.AdminOOCColor, curPrefs.HighestPriorityJob);
 
             if (ShouldStorePrefs(message.MsgChannel.AuthType))
             {
@@ -294,7 +294,7 @@ namespace Content.Server.Preferences.Managers
             return new PlayerPreferences(prefs.Characters.Select(p =>
             {
                 return new KeyValuePair<int, ICharacterProfile>(p.Key, p.Value.Validated(session, collection));
-            }), prefs.SelectedCharacterIndex, prefs.AdminOOCColor);
+            }), prefs.SelectedCharacterIndex, prefs.AdminOOCColor, prefs.HighestPriorityJob);
         }
 
         public IEnumerable<KeyValuePair<NetUserId, ICharacterProfile>> GetSelectedProfilesForPlayers(

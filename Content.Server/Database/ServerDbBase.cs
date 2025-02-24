@@ -65,7 +65,7 @@ namespace Content.Server.Database
                 profiles[profile.Slot] = ConvertProfiles(profile);
             }
 
-            return new PlayerPreferences(profiles, prefs.SelectedCharacterSlot, Color.FromHex(prefs.AdminOOCColor));
+            return new PlayerPreferences(profiles, prefs.SelectedCharacterSlot, Color.FromHex(prefs.AdminOOCColor), prefs.HighestPriorityJob);
         }
 
         public async Task SaveSelectedCharacterIndexAsync(NetUserId userId, int index)
@@ -262,7 +262,8 @@ namespace Content.Server.Database
                 (PreferenceUnavailableMode) profile.PreferenceUnavailable,
                 antags.ToHashSet(),
                 traits.ToHashSet(),
-                loadouts
+                loadouts,
+                profile.RoundStartCandidate
             );
         }
 
@@ -343,6 +344,7 @@ namespace Content.Server.Database
 
                 profile.Loadouts.Add(dz);
             }
+            profile.RoundStartCandidate = humanoid.RoundStartCandidate;
 
             return profile;
         }

@@ -11,6 +11,8 @@ namespace Content.Shared.Preferences
 
         ICharacterAppearance CharacterAppearance { get; }
 
+        bool RoundStartCandidate { get; }
+
         bool MemberwiseEquals(ICharacterProfile other);
 
         /// <summary>

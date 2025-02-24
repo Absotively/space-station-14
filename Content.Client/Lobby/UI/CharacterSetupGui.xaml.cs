@@ -11,6 +11,7 @@ using Robust.Client.UserInterface.Controls;
 using Robust.Client.UserInterface.XAML;
 using Robust.Shared.Configuration;
 using Robust.Shared.Prototypes;
+using static Robust.Client.UserInterface.Controls.BaseButton;
 
 namespace Content.Client.Lobby.UI
 {
@@ -28,6 +29,7 @@ namespace Content.Client.Lobby.UI
 
         private readonly Button _createNewCharacterButton;
 
+        public event Action<int, ButtonToggledEventArgs>? ToggleCharacter;
         public event Action<int>? SelectCharacter;
         public event Action<int>? DeleteCharacter;
 
@@ -99,10 +101,28 @@ namespace Content.Client.Lobby.UI
 
                 Characters.AddChild(characterPickerButton);
 
-                characterPickerButton.OnPressed += args =>
+                if (_cfg.GetCVar(CCVars.MultipleCharacterSelection))
                 {
-                    SelectCharacter?.Invoke(slot);
-                };
+                    characterPickerButton.ToggleMode = true;
+                    characterPickerButton.Group = null;
+                    characterPickerButton.Pressed = character.RoundStartCandidate;
+                    characterPickerButton.OnToggled += args =>
+                    {
+                        ToggleCharacter?.Invoke(slot, args);
+                    };
+                    characterPickerButton.EditButton.OnPressed += args =>
+                    {
+                        SelectCharacter?.Invoke(slot);
+                    };
+                }
+                else
+                {
+                    characterPickerButton.OnPressed += args =>
+                    {
+                        SelectCharacter?.Invoke(slot);
+                    };
+                    characterPickerButton.EditButton.Visible = false;
+                }
 
                 characterPickerButton.OnDeletePressed += () =>
                 {

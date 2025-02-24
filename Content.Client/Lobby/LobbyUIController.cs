@@ -318,6 +318,31 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
             }
         };
 
+        if (_configurationManager.GetCVar(CCVars.MultipleCharacterSelection))
+        {
+            _characterSetup.ToggleCharacter += (slot, toggleArgs) =>
+            {
+                bool roundStartCandidate = toggleArgs.Pressed;
+                if (!toggleArgs.Pressed && _preferencesManager.Preferences?.RoundStartCandidates.Count < 2)
+                {
+                    // don't allow deselecting only selected character
+                    roundStartCandidate = true;
+                }
+                var updatedProfile = ((HumanoidCharacterProfile?)_preferencesManager.Preferences?.Characters[slot])?.WithRoundStartCandidate(roundStartCandidate);
+                if (updatedProfile != null)
+                {
+                    _preferencesManager.UpdateCharacter(updatedProfile, slot);
+                    if (slot == EditedSlot)
+                    {
+                        // support toggling characters while in the middle of editing a character,
+                        // mostly because preventing it seems likely to make the UI more confusing
+                        _profileEditor.Profile = EditedProfile?.WithRoundStartCandidate(roundStartCandidate);
+                    }
+                }
+                toggleArgs.Button.Pressed = roundStartCandidate;
+            };
+        }
+
         if (_stateManager.CurrentState is LobbyState lobby)
         {
             lobby.Lobby?.CharacterSetupState.AddChild(_characterSetup);

@@ -12,12 +12,18 @@
         <Label Name="DescriptionLabel"
                ClipText="True"
                HorizontalExpand="True"/>
-        <Button Name="DeleteButton"
-                Text="{Loc 'character-setup-gui-character-picker-button-delete-button'}"/>
-        <Button Name="ConfirmDeleteButton"
-                Text="{Loc 'character-setup-gui-character-picker-button-confirm-delete-button'}"
-                Visible="False"
-                ModulateSelfOverride="{x:Static style:StyleNano.ButtonColorCautionDefault}"/>
+        <BoxContainer Orientation="Vertical"
+                      VerticalAlignment="Center">
+            <Button Name="EditButton"
+                    Access="Public"
+                    Text="{Loc 'character-setup-gui-character-picker-button-edit-button'}"/>
+            <Button Name="DeleteButton"
+                    Text="{Loc 'character-setup-gui-character-picker-button-delete-button'}"/>
+            <Button Name="ConfirmDeleteButton"
+                    Text="{Loc 'character-setup-gui-character-picker-button-confirm-delete-button'}"
+                    Visible="False"
+                    ModulateSelfOverride="{x:Static style:StyleNano.ButtonColorCautionDefault}"/>
+        </BoxContainer>
 
     </BoxContainer>
 </ContainerButton>
