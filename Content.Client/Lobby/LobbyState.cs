@@ -26,6 +26,7 @@ namespace Content.Client.Lobby
         [Dependency] private readonly IUserInterfaceManager _userInterfaceManager = default!;
         [Dependency] private readonly IGameTiming _gameTiming = default!;
         [Dependency] private readonly IVoteManager _voteManager = default!;
+        [Dependency] private readonly IClientPreferencesManager _preferencesManager = default!;
 
         private ClientGameTicker _gameTicker = default!;
         private ContentAudioSystem _contentAudioSystem = default!;
@@ -95,6 +96,7 @@ namespace Content.Client.Lobby
         {
             // Yeah I hate this but LobbyState contains all the badness for now.
             Lobby?.SwitchState(state);
+            UpdateLobbyUi();
         }
 
         private void OnSetupPressed(BaseButton.ButtonEventArgs args)
@@ -180,14 +182,26 @@ namespace Content.Client.Lobby
                 Lobby!.ReadyButton.ToggleMode = false;
                 Lobby!.ReadyButton.Pressed = false;
                 Lobby!.ObserveButton.Disabled = false;
+                Lobby!.ReadyButton.ToolTip = null;
             }
             else
             {
                 Lobby!.StartTime.Text = string.Empty;
                 Lobby!.ReadyButton.Text = Loc.GetString(Lobby!.ReadyButton.Pressed ? "lobby-state-player-status-ready": "lobby-state-player-status-not-ready");
                 Lobby!.ReadyButton.ToggleMode = true;
-                Lobby!.ReadyButton.Disabled = false;
-                Lobby!.ReadyButton.Pressed = _gameTicker.AreWeReady;
+                if (
+                    _cfg.GetCVar(CCVars.MultipleCharacterSelection)
+                    && _preferencesManager.Preferences?.RoundStartCandidates.Count == 0)
+                {
+                    Lobby!.ReadyButton.Disabled = true;
+                    Lobby!.ReadyButton.ToolTip = Loc.GetString("lobby-state-ready-button-no-active-chars-tooltip");
+                }
+                else
+                {
+                    Lobby!.ReadyButton.Disabled = false;
+                    Lobby!.ReadyButton.ToolTip = null;
+                    Lobby!.ReadyButton.Pressed = _gameTicker.AreWeReady;
+                }
                 Lobby!.ObserveButton.Disabled = true;
             }
 

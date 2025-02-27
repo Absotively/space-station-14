@@ -61,7 +61,6 @@ public sealed partial class CharacterPickerButton : ContainerButton
         }
 
         Pressed = isSelected;
-        EditButton.Visible = !isSelected;
         DeleteButton.Visible = !isSelected;
 
         View.SetEntity(_previewDummy);
@@ -79,9 +78,26 @@ public sealed partial class CharacterPickerButton : ContainerButton
             DeleteButton.Visible = false;
             ConfirmDeleteButton.Visible = true;
         };
+
+        RoundStartCandidateButton.OnToggled += args =>
+        {
+            UpdateRoundStartCandidateButtonText();
+        };
     }
 
-    protected override void Dispose(bool disposing)
+    public void UpdateRoundStartCandidateButtonText()
+    {
+        if (RoundStartCandidateButton.Pressed)
+        {
+            RoundStartCandidateButton.Text = Loc.GetString("character-setup-gui-character-picker-button-round-start-button-active");
+        }
+        else
+        {
+            RoundStartCandidateButton.Text = Loc.GetString("character-setup-gui-character-picker-button-round-start-button-inactive");
+        }
+    }
+
+protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
         if (!disposing)

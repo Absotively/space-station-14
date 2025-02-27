@@ -101,27 +101,25 @@ namespace Content.Client.Lobby.UI
 
                 Characters.AddChild(characterPickerButton);
 
+                characterPickerButton.OnPressed += args =>
+                {
+                    SelectCharacter?.Invoke(slot);
+                };
+
                 if (_cfg.GetCVar(CCVars.MultipleCharacterSelection))
                 {
-                    characterPickerButton.ToggleMode = true;
-                    characterPickerButton.Group = null;
-                    characterPickerButton.Pressed = character.RoundStartCandidate;
-                    characterPickerButton.OnToggled += args =>
+                    characterPickerButton.RoundStartCandidateButton.ToggleMode = true;
+                    characterPickerButton.RoundStartCandidateButton.Group = null;
+                    characterPickerButton.RoundStartCandidateButton.Pressed = character.RoundStartCandidate;
+                    characterPickerButton.RoundStartCandidateButton.OnToggled += args =>
                     {
                         ToggleCharacter?.Invoke(slot, args);
                     };
-                    characterPickerButton.EditButton.OnPressed += args =>
-                    {
-                        SelectCharacter?.Invoke(slot);
-                    };
+                    characterPickerButton.UpdateRoundStartCandidateButtonText();
                 }
                 else
                 {
-                    characterPickerButton.OnPressed += args =>
-                    {
-                        SelectCharacter?.Invoke(slot);
-                    };
-                    characterPickerButton.EditButton.Visible = false;
+                    characterPickerButton.RoundStartCandidateButton.Visible = false;
                 }
 
                 characterPickerButton.OnDeletePressed += () =>

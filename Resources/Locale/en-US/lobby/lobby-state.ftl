@@ -5,6 +5,7 @@ lobby-state-right-now-confirmation = Right Now
 lobby-state-round-start-countdown-text = Round starts In: {$timeLeft}
 lobby-state-ready-button-join-state = Join
 lobby-state-ready-button-ready-up-state = Ready Up
+lobby-state-ready-button-no-active-chars-tooltip = Can't ready up, no characters active
 lobby-state-player-status-not-ready = Not Ready
 lobby-state-player-status-ready = Ready
 lobby-state-player-status-observer = Observer

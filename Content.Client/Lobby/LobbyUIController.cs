@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Content.Client.Guidebook;
 using Content.Client.Humanoid;
@@ -5,6 +6,7 @@ using Content.Client.Inventory;
 using Content.Client.Lobby.UI;
 using Content.Client.Players.PlayTimeTracking;
 using Content.Client.Station;
+using Content.Client.UserInterface.ControlExtensions;
 using Content.Shared.CCVar;
 using Content.Shared.Clothing;
 using Content.Shared.GameTicking;
@@ -20,6 +22,7 @@ using Robust.Client.ResourceManagement;
 using Robust.Client.State;
 using Robust.Client.UserInterface;
 using Robust.Client.UserInterface.Controllers;
+using Robust.Client.UserInterface.Controls;
 using Robust.Shared.Configuration;
 using Robust.Shared.Map;
 using Robust.Shared.Prototypes;
@@ -322,13 +325,7 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
         {
             _characterSetup.ToggleCharacter += (slot, toggleArgs) =>
             {
-                bool roundStartCandidate = toggleArgs.Pressed;
-                if (!toggleArgs.Pressed && _preferencesManager.Preferences?.RoundStartCandidates.Count < 2)
-                {
-                    // don't allow deselecting only selected character
-                    roundStartCandidate = true;
-                }
-                var updatedProfile = ((HumanoidCharacterProfile?)_preferencesManager.Preferences?.Characters[slot])?.WithRoundStartCandidate(roundStartCandidate);
+                var updatedProfile = ((HumanoidCharacterProfile?)_preferencesManager.Preferences?.Characters[slot])?.WithRoundStartCandidate(toggleArgs.Pressed);
                 if (updatedProfile != null)
                 {
                     _preferencesManager.UpdateCharacter(updatedProfile, slot);
@@ -336,10 +333,9 @@ public sealed class LobbyUIController : UIController, IOnStateEntered<LobbyState
                     {
                         // support toggling characters while in the middle of editing a character,
                         // mostly because preventing it seems likely to make the UI more confusing
-                        _profileEditor.Profile = EditedProfile?.WithRoundStartCandidate(roundStartCandidate);
+                        _profileEditor.Profile = EditedProfile?.WithRoundStartCandidate(toggleArgs.Pressed);
                     }
                 }
-                toggleArgs.Button.Pressed = roundStartCandidate;
             };
         }
 
