@@ -3,8 +3,11 @@ using Content.Server.Administration.Managers;
 using Content.Server.Players.PlayTimeTracking;
 using Content.Server.Station.Components;
 using Content.Server.Station.Events;
+using Content.Shared.CCVar;
 using Content.Shared.Preferences;
+using Content.Shared.Random.Helpers;
 using Content.Shared.Roles;
+using Robust.Shared.Configuration;
 using Robust.Shared.Network;
 using Robust.Shared.Prototypes;
 using Robust.Shared.Random;
@@ -17,9 +20,21 @@ public sealed partial class StationJobsSystem
 {
     [Dependency] private readonly IPrototypeManager _prototypeManager = default!;
     [Dependency] private readonly IBanManager _banManager = default!;
+    [Dependency] private readonly IConfigurationManager _configManager = default!;
+    [Dependency] private readonly IRobustRandom _robustRandom = default!;
 
     private Dictionary<int, HashSet<string>> _jobsByWeight = default!;
     private List<int> _orderedWeights = default!;
+
+    /// <summary>
+    /// Used for assigning characters when <see cref="CCVars.MultipleCharacterSelection"/> is true. Would be
+    /// const if const dictionaries existed in C#.
+    /// </summary>
+    private readonly Dictionary<JobPriority, float> characterSelectionWeights = new Dictionary<JobPriority, float>() {
+        { JobPriority.Low, 1 },
+        { JobPriority.Medium, 3 },
+        { JobPriority.High, 9 }
+    };
 
     /// <summary>
     /// Sets up some tables used by AssignJobs, including jobs sorted by their weights, and a list of weights in order from highest to lowest.
@@ -42,35 +57,35 @@ public sealed partial class StationJobsSystem
     /// Assigns jobs based on the given preferences and list of stations to assign for.
     /// This does NOT change the slots on the station, only figures out where each player should go.
     /// </summary>
-    /// <param name="profiles">The profiles to use for selection.</param>
+    /// <param name="preferences">The player preferences to use for selection.</param>
     /// <param name="stations">List of stations to assign for.</param>
-    /// <param name="useRoundStartJobs">Whether or not to use the round-start jobs for the stations instead of their current jobs.</param>
+    /// <param name="useRoundStartCandidates">Whether or not to use the round-start jobs for the stations instead of their current jobs.
+    /// If true, also select a character for players who are assigned a job.</param>
     /// <returns>List of players and their assigned jobs.</returns>
     /// <remarks>
     /// You probably shouldn't use useRoundStartJobs mid-round if the station has been available to join,
     /// as there may end up being more round-start slots than available slots, which can cause weird behavior.
     /// A warning to all who enter ye cursed lands: This function is long and mildly incomprehensible. Best used without touching.
     /// </remarks>
-    public Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid)> AssignJobs(Dictionary<NetUserId, HumanoidCharacterProfile> profiles, IReadOnlyList<EntityUid> stations, bool useRoundStartJobs = true)
+    public Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid, HumanoidCharacterProfile?)> AssignJobs(Dictionary<NetUserId, PlayerPreferences> preferences, IReadOnlyList<EntityUid> stations, bool useRoundStartCandidates = true)
     {
         DebugTools.Assert(stations.Count > 0);
 
         InitializeRoundStart();
 
-        if (profiles.Count == 0)
+        if (preferences.Count == 0)
             return new();
 
-        // We need to modify this collection later, so make a copy of it.
-        profiles = profiles.ShallowClone();
+        var mergedPriorities = MergePlayerJobPriorities(preferences);
 
         // Player <-> (job, station)
-        var assigned = new Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid)>(profiles.Count);
+        var assigned = new Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid, HumanoidCharacterProfile?)>(preferences.Count);
 
         // The jobs left on the stations. This collection is modified as jobs are assigned to track what's available.
         var stationJobs = new Dictionary<EntityUid, Dictionary<ProtoId<JobPrototype>, int?>>();
         foreach (var station in stations)
         {
-            if (useRoundStartJobs)
+            if (useRoundStartCandidates)
             {
                 stationJobs.Add(station, GetRoundStartJobs(station).ToDictionary(x => x.Key, x => x.Value));
             }
@@ -103,10 +118,10 @@ public sealed partial class StationJobsSystem
         {
             for (var selectedPriority = JobPriority.High; selectedPriority > JobPriority.Never; selectedPriority--)
             {
-                if (profiles.Count == 0)
+                if (mergedPriorities.Count == 0)
                     goto endFunc;
 
-                var candidates = GetPlayersJobCandidates(weight, selectedPriority, profiles);
+                var candidates = GetPlayersJobCandidates(weight, selectedPriority, mergedPriorities);
 
                 var optionsRemaining = 0;
 
@@ -121,9 +136,24 @@ public sealed partial class StationJobsSystem
                             jobPlayerOptions.Remove(k);
                     }
 
+                    var prefs = preferences[player];
+                    var selectedProfile = (HumanoidCharacterProfile)prefs.SelectedCharacter;
+                    if (useRoundStartCandidates)
+                    {
+                        var candidateProfileWeights = new Dictionary<HumanoidCharacterProfile, float>();
+                        foreach (HumanoidCharacterProfile candidateProfile in prefs.RoundStartCandidates)
+                        {
+                            if (candidateProfile.JobPriorities.ContainsKey(job))
+                            {
+                                candidateProfileWeights.Add(candidateProfile, characterSelectionWeights[candidateProfile.JobPriorities[job]]);
+                            }
+                        }
+                        selectedProfile = _robustRandom.Pick(candidateProfileWeights);
+                    }
+
                     stationJobs[station][job]--;
-                    profiles.Remove(player);
-                    assigned.Add(player, (job, station));
+                    mergedPriorities.Remove(player);
+                    assigned.Add(player, (job, station, selectedProfile));
 
                     optionsRemaining--;
                 }
@@ -270,12 +300,12 @@ public sealed partial class StationJobsSystem
     /// </summary>
     /// <param name="assignedJobs">All assigned jobs.</param>
     /// <param name="allPlayersToAssign">All players that might need an overflow assigned.</param>
-    /// <param name="profiles">Player character profiles.</param>
+    /// <param name="preferences">Player preferences.</param>
     /// <param name="stations">The stations to consider for spawn location.</param>
     public void AssignOverflowJobs(
-        ref Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid)> assignedJobs,
+        ref Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid, HumanoidCharacterProfile?)> assignedJobs,
         IEnumerable<NetUserId> allPlayersToAssign,
-        IReadOnlyDictionary<NetUserId, HumanoidCharacterProfile> profiles,
+        IReadOnlyDictionary<NetUserId, PlayerPreferences> preferences,
         IReadOnlyList<EntityUid> stations)
     {
         var givenStations = stations.ToList();
@@ -289,10 +319,29 @@ public sealed partial class StationJobsSystem
                 continue;
             }
 
-            var profile = profiles[player];
-            if (profile.PreferenceUnavailable != PreferenceUnavailableMode.SpawnAsOverflow)
+            var prefs = preferences[player];
+            HumanoidCharacterProfile? overflowProfile = null;
+            if (_configManager.GetCVar(CCVars.MultipleCharacterSelection))
             {
-                assignedJobs.Add(player, (null, EntityUid.Invalid));
+                var overflowCandidates = prefs.RoundStartCandidates.Where(
+                    c => ((HumanoidCharacterProfile)c).PreferenceUnavailable == PreferenceUnavailableMode.SpawnAsOverflow
+                );
+                if (overflowCandidates.Count() > 0)
+                {
+                    overflowProfile = (HumanoidCharacterProfile)_robustRandom.Pick(overflowCandidates.ToList());
+                }
+            }
+            else
+            {
+                var profile = (HumanoidCharacterProfile)prefs.SelectedCharacter;
+                if (profile.PreferenceUnavailable != PreferenceUnavailableMode.SpawnAsOverflow)
+                {
+                    overflowProfile = profile;
+                }
+            }
+            if (overflowProfile == null)
+            {
+                assignedJobs.Add(player, (null, EntityUid.Invalid, null));
                 continue;
             }
 
@@ -309,7 +358,7 @@ public sealed partial class StationJobsSystem
                     continue;
 
                 // If the overflow exists, put them in as it.
-                assignedJobs.Add(player, (overflows[0], givenStations[0]));
+                assignedJobs.Add(player, (overflows[0], givenStations[0], overflowProfile));
                 break;
             }
         }
@@ -332,32 +381,113 @@ public sealed partial class StationJobsSystem
     }
 
     /// <summary>
+    /// Make a dictionary out each player's job preferences, taking into account whether
+    /// <see cref="CCVars.MultipleCharacterSelection"/> is true.
+    /// </summary>
+    /// <param name="preferences">Player preferences</param>
+    /// <returns></returns>
+    private Dictionary<NetUserId, Dictionary<JobPriority, HashSet<ProtoId<JobPrototype>>>> MergePlayerJobPriorities(Dictionary<NetUserId, PlayerPreferences> preferences)
+    {
+        var mergedPreferences = new Dictionary<NetUserId, Dictionary<JobPriority, HashSet<ProtoId<JobPrototype>>>>();
+        foreach (var (player, prefs) in preferences)
+        {
+            mergedPreferences[player] = new Dictionary<JobPriority, HashSet<ProtoId<JobPrototype>>>();
+            foreach (JobPriority priorityValue in Enum.GetValues(typeof(JobPriority)))
+            {
+                if (priorityValue != JobPriority.Never)
+                {
+                    mergedPreferences[player][priorityValue] = new HashSet<ProtoId<JobPrototype>>();
+                }
+            }
+            if (_configManager.GetCVar(CCVars.MultipleCharacterSelection))
+            {
+                var haveHighestPriorityJobProfile = false;
+                ProtoId<JobPrototype>? highestPriorityJobId = prefs.HighestPriorityJob;
+                var highPriorityJobs = new List<ProtoId<JobPrototype>>();
+                foreach (HumanoidCharacterProfile profile in prefs.RoundStartCandidates)
+                {
+                    foreach (var (jobId, jobPriority) in profile.JobPriorities)
+                    {
+                        if (jobPriority == JobPriority.High)
+                        {
+                            if (jobId == highestPriorityJobId)
+                            {
+                                haveHighestPriorityJobProfile = true;
+                            }
+                            else
+                            {
+                                highPriorityJobs.Add(jobId);
+                            }
+                        }
+                        else
+                        {
+                            mergedPreferences[player][jobPriority].Add(jobId);
+                        }
+                    }
+                }
+                var actualHighPrioJob = haveHighestPriorityJobProfile ? (ProtoId<JobPrototype>)highestPriorityJobId! : _random.PickAndTake(highPriorityJobs);
+                mergedPreferences[player][JobPriority.High].Add(actualHighPrioJob);
+                foreach (var profileHighPrioJob in highPriorityJobs)
+                {
+                    mergedPreferences[player][JobPriority.Medium].Add(profileHighPrioJob);
+                }
+                // remove duplicate entries, though in practice they might not affect anything
+                mergedPreferences[player][JobPriority.Medium].Remove(actualHighPrioJob);
+                mergedPreferences[player][JobPriority.Low].Remove(actualHighPrioJob);
+                foreach (var mediumPrioJob in mergedPreferences[player][JobPriority.Medium])
+                {
+                    mergedPreferences[player][JobPriority.Low].Remove(mediumPrioJob);
+                }
+            }
+            else
+            {
+                var profile = (HumanoidCharacterProfile)prefs.SelectedCharacter;
+                foreach (var (jobId, jobPriority) in profile.JobPriorities)
+                {
+                    mergedPreferences[player][jobPriority].Add(jobId);
+                }
+            }
+        }
+        return mergedPreferences;
+    }
+
+    /// <summary>
     /// Gets all jobs that the input players have that match the given weight and priority.
     /// </summary>
     /// <param name="weight">Weight to find, if any.</param>
     /// <param name="selectedPriority">Priority to find, if any.</param>
-    /// <param name="profiles">Profiles to look in.</param>
+    /// <param name="mergedJobPriorities">Job priorities to use.</param>
     /// <returns>Players and a list of their matching jobs.</returns>
-    private Dictionary<NetUserId, List<string>> GetPlayersJobCandidates(int? weight, JobPriority? selectedPriority, Dictionary<NetUserId, HumanoidCharacterProfile> profiles)
+    private Dictionary<NetUserId, List<string>> GetPlayersJobCandidates(
+        int? weight,
+        JobPriority? selectedPriority,
+        Dictionary<NetUserId, Dictionary<JobPriority, HashSet<ProtoId<JobPrototype>>>> mergedJobPriorities)
     {
-        var outputDict = new Dictionary<NetUserId, List<string>>(profiles.Count);
+        var outputDict = new Dictionary<NetUserId, List<string>>(mergedJobPriorities.Count);
 
-        foreach (var (player, profile) in profiles)
+        foreach (var (player, priorities) in mergedJobPriorities)
         {
+            if (priorities == null) continue;
             var roleBans = _banManager.GetJobBans(player);
-            var profileJobs = profile.JobPriorities.Keys.Select(k => new ProtoId<JobPrototype>(k)).ToList();
-            var ev = new StationJobsGetCandidatesEvent(player, profileJobs);
+            var jobs = new HashSet<ProtoId<JobPrototype>>();
+            if (selectedPriority != null)
+            {
+                foreach (var prioJobs in priorities.Values)
+                {
+                    jobs.UnionWith(prioJobs);
+                }
+            }
+            else
+            {
+                jobs = priorities[(JobPriority)selectedPriority!];
+            }
+            var ev = new StationJobsGetCandidatesEvent(player, jobs.ToList());
             RaiseLocalEvent(ref ev);
 
             List<string>? availableJobs = null;
 
-            foreach (var jobId in profileJobs)
+            foreach (var jobId in jobs)
             {
-                var priority = profile.JobPriorities[jobId];
-
-                if (!(priority == selectedPriority || selectedPriority is null))
-                    continue;
-
                 if (!_prototypeManager.TryIndex(jobId, out var job))
                     continue;
 
@@ -367,7 +497,7 @@ public sealed partial class StationJobsSystem
                 if (!(roleBans == null || !roleBans.Contains(jobId)))
                     continue;
 
-                availableJobs ??= new List<string>(profile.JobPriorities.Count);
+                availableJobs ??= new List<string>(jobs.Count);
                 availableJobs.Add(jobId);
             }
 

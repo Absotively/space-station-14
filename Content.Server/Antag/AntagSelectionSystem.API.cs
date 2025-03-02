@@ -161,7 +161,7 @@ public sealed partial class AntagSelectionSystem
     /// <summary>
     /// Checks if a given session has the primary antag preferences for a given definition
     /// </summary>
-    public bool HasPrimaryAntagPreference(ICommonSession? session, AntagSelectionDefinition def)
+    public bool HasPrimaryAntagPreference(ICommonSession? session, AntagSelectionDefinition def, bool useRoundStartCandidates)
     {
         if (session == null)
             return true;
@@ -169,14 +169,28 @@ public sealed partial class AntagSelectionSystem
         if (def.PrefRoles.Count == 0)
             return false;
 
-        var pref = (HumanoidCharacterProfile) _pref.GetPreferences(session.UserId).SelectedCharacter;
-        return pref.AntagPreferences.Any(p => def.PrefRoles.Contains(p));
+        if (useRoundStartCandidates)
+        {
+            foreach (HumanoidCharacterProfile profile in _pref.GetPreferences(session.UserId).RoundStartCandidates)
+            {
+                if (profile.AntagPreferences.Any(p => def.PrefRoles.Contains(p)))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        else
+        {
+            var profile = (HumanoidCharacterProfile)_pref.GetPreferences(session.UserId).SelectedCharacter;
+            return profile.AntagPreferences.Any(p => def.PrefRoles.Contains(p));
+        }
     }
 
     /// <summary>
     /// Checks if a given session has the fallback antag preferences for a given definition
     /// </summary>
-    public bool HasFallbackAntagPreference(ICommonSession? session, AntagSelectionDefinition def)
+    public bool HasFallbackAntagPreference(ICommonSession? session, AntagSelectionDefinition def, bool useRoundStartCandidates)
     {
         if (session == null)
             return true;
@@ -184,8 +198,22 @@ public sealed partial class AntagSelectionSystem
         if (def.FallbackRoles.Count == 0)
             return false;
 
-        var pref = (HumanoidCharacterProfile) _pref.GetPreferences(session.UserId).SelectedCharacter;
-        return pref.AntagPreferences.Any(p => def.FallbackRoles.Contains(p));
+        if (useRoundStartCandidates)
+        {
+            foreach (HumanoidCharacterProfile profile in _pref.GetPreferences(session.UserId).RoundStartCandidates)
+            {
+                if (profile.AntagPreferences.Any(p => def.FallbackRoles.Contains(p)))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        else
+        {
+            var profile = (HumanoidCharacterProfile)_pref.GetPreferences(session.UserId).SelectedCharacter;
+            return profile.AntagPreferences.Any(p => def.FallbackRoles.Contains(p));
+        }
     }
 
     /// <summary>

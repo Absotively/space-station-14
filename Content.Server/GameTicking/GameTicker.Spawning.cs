@@ -58,21 +58,21 @@ namespace Content.Server.GameTicking
         }
 
         private void SpawnPlayers(List<ICommonSession> readyPlayers,
-            Dictionary<NetUserId, HumanoidCharacterProfile> profiles,
+            Dictionary<NetUserId, PlayerPreferences> preferences,
             bool force)
         {
             // Allow game rules to spawn players by themselves if needed. (For example, nuke ops or wizard)
-            RaiseLocalEvent(new RulePlayerSpawningEvent(readyPlayers, profiles, force));
+            RaiseLocalEvent(new RulePlayerSpawningEvent(readyPlayers, force));
 
             var playerNetIds = readyPlayers.Select(o => o.UserId).ToHashSet();
 
-            // RulePlayerSpawning feeds a readonlydictionary of profiles.
-            // We need to take these players out of the pool of players available as they've been used.
-            if (readyPlayers.Count != profiles.Count)
+            // RulePlayerSpawning doesn't use the preferences dictionary, but we want to use it as the
+            // available pool for job assignments. We need to remove players that have been used.
+            if (readyPlayers.Count != preferences.Count)
             {
                 var toRemove = new RemQueue<NetUserId>();
 
-                foreach (var (player, _) in profiles)
+                foreach (var (player, _) in preferences)
                 {
                     if (playerNetIds.Contains(player))
                         continue;
@@ -82,18 +82,18 @@ namespace Content.Server.GameTicking
 
                 foreach (var player in toRemove)
                 {
-                    profiles.Remove(player);
+                    preferences.Remove(player);
                 }
             }
 
             var spawnableStations = GetSpawnableStations();
-            var assignedJobs = _stationJobs.AssignJobs(profiles, spawnableStations);
+            var assignedJobs = _stationJobs.AssignJobs(preferences, spawnableStations);
 
-            _stationJobs.AssignOverflowJobs(ref assignedJobs, playerNetIds, profiles, spawnableStations);
+            _stationJobs.AssignOverflowJobs(ref assignedJobs, playerNetIds, preferences, spawnableStations);
 
             // Calculate extended access for stations.
             var stationJobCounts = spawnableStations.ToDictionary(e => e, _ => 0);
-            foreach (var (netUser, (job, station)) in assignedJobs)
+            foreach (var (netUser, (job, station, profile)) in assignedJobs)
             {
                 if (job == null)
                 {
@@ -109,12 +109,12 @@ namespace Content.Server.GameTicking
             _stationJobs.CalcExtendedAccess(stationJobCounts);
 
             // Spawn everybody in!
-            foreach (var (player, (job, station)) in assignedJobs)
+            foreach (var (player, (job, station, profile)) in assignedJobs)
             {
-                if (job == null)
+                if (job == null || profile == null)
                     continue;
 
-                SpawnPlayer(_playerManager.GetSessionById(player), profiles[player], station, job, false);
+                SpawnPlayer(_playerManager.GetSessionById(player), profile, station, job, false);
             }
 
             RefreshLateJoinAllowed();
@@ -122,7 +122,6 @@ namespace Content.Server.GameTicking
             // Allow rules to add roles to players who have been spawned in. (For example, on-station traitors)
             RaiseLocalEvent(new RulePlayerJobsAssignedEvent(
                 assignedJobs.Keys.Select(x => _playerManager.GetSessionById(x)).ToArray(),
-                profiles,
                 force));
         }
 
