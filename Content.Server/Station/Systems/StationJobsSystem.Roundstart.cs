@@ -67,7 +67,7 @@ public sealed partial class StationJobsSystem
     /// as there may end up being more round-start slots than available slots, which can cause weird behavior.
     /// A warning to all who enter ye cursed lands: This function is long and mildly incomprehensible. Best used without touching.
     /// </remarks>
-    public Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid, HumanoidCharacterProfile?)> AssignJobs(Dictionary<NetUserId, PlayerPreferences> preferences, IReadOnlyList<EntityUid> stations, bool useRoundStartCandidates = true)
+    public Dictionary<NetUserId, (ProtoId<JobPrototype>?, EntityUid, HumanoidCharacterProfile?)> AssignJobs(Dictionary<NetUserId, PlayerPreferences> preferences, IReadOnlyList<EntityUid> stations, bool useRoundStartCandidates)
     {
         DebugTools.Assert(stations.Count > 0);
 

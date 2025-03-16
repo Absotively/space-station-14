@@ -7,6 +7,7 @@ using Content.Server.GameTicking.Events;
 using Content.Server.Spawners.Components;
 using Content.Server.Speech.Components;
 using Content.Server.Station.Components;
+using Content.Shared.CCVar;
 using Content.Shared.Database;
 using Content.Shared.GameTicking;
 using Content.Shared.Mind;
@@ -87,7 +88,8 @@ namespace Content.Server.GameTicking
             }
 
             var spawnableStations = GetSpawnableStations();
-            var assignedJobs = _stationJobs.AssignJobs(preferences, spawnableStations);
+            var useRoundStartCandidates = _cfg.GetCVar(CCVars.MultipleCharacterSelection);
+            var assignedJobs = _stationJobs.AssignJobs(preferences, spawnableStations, useRoundStartCandidates);
 
             _stationJobs.AssignOverflowJobs(ref assignedJobs, playerNetIds, preferences, spawnableStations);
 
