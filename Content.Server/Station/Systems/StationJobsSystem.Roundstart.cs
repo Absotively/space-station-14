@@ -470,7 +470,7 @@ public sealed partial class StationJobsSystem
             if (priorities == null) continue;
             var roleBans = _banManager.GetJobBans(player);
             var jobs = new HashSet<ProtoId<JobPrototype>>();
-            if (selectedPriority != null)
+            if (selectedPriority == null)
             {
                 foreach (var prioJobs in priorities.Values)
                 {
@@ -479,7 +479,7 @@ public sealed partial class StationJobsSystem
             }
             else
             {
-                jobs = priorities[(JobPriority)selectedPriority!];
+                jobs = priorities[(JobPriority)selectedPriority];
             }
             var ev = new StationJobsGetCandidatesEvent(player, jobs.ToList());
             RaiseLocalEvent(ref ev);
