@@ -59,7 +59,7 @@ public sealed partial class StationJobsSystem
     /// </summary>
     /// <param name="preferences">The player preferences to use for selection.</param>
     /// <param name="stations">List of stations to assign for.</param>
-    /// <param name="useRoundStartCandidates">Whether or not to use the round-start jobs for the stations instead of their current jobs.
+    /// <param name="useRoundStartCandidates">Whether to look at all round start candidate characters for each player.
     /// If true, also select a character for players who are assigned a job.</param>
     /// <returns>List of players and their assigned jobs.</returns>
     /// <remarks>
@@ -85,14 +85,7 @@ public sealed partial class StationJobsSystem
         var stationJobs = new Dictionary<EntityUid, Dictionary<ProtoId<JobPrototype>, int?>>();
         foreach (var station in stations)
         {
-            if (useRoundStartCandidates)
-            {
-                stationJobs.Add(station, GetRoundStartJobs(station).ToDictionary(x => x.Key, x => x.Value));
-            }
-            else
-            {
-                stationJobs.Add(station, GetJobs(station).ToDictionary(x => x.Key, x => x.Value));
-            }
+            stationJobs.Add(station, GetRoundStartJobs(station).ToDictionary(x => x.Key, x => x.Value));
         }
 
 
