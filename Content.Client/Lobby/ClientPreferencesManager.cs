@@ -1,5 +1,6 @@
 using System.Linq;
 using Content.Shared.Preferences;
+using Content.Shared.Roles;
 using Robust.Client;
 using Robust.Client.Player;
 using Robust.Shared.Network;
@@ -29,6 +30,7 @@ namespace Content.Client.Lobby
             _netManager.RegisterNetMessage<MsgUpdateCharacter>();
             _netManager.RegisterNetMessage<MsgSelectCharacter>();
             _netManager.RegisterNetMessage<MsgDeleteCharacter>();
+            _netManager.RegisterNetMessage<MsgSelectHighestPrioJob>();
 
             _baseClient.RunLevelChanged += BaseClientOnRunLevelChanged;
         }
@@ -102,6 +104,19 @@ namespace Content.Client.Lobby
             var msg = new MsgDeleteCharacter
             {
                 Slot = slot
+            };
+            _netManager.ClientSendMessage(msg);
+        }
+        public void SelectHighestPrioJob(string? jobID)
+        {
+            Preferences = new PlayerPreferences(
+                Preferences.Characters,
+                Preferences.SelectedCharacterIndex,
+                Preferences.AdminOOCColor,
+                jobID);
+            var msg = new MsgSelectHighestPrioJob
+            {
+                JobID = jobID
             };
             _netManager.ClientSendMessage(msg);
         }

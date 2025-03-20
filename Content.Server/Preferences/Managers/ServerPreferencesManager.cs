@@ -15,7 +15,8 @@ namespace Content.Server.Preferences.Managers
 {
     /// <summary>
     /// Sends <see cref="MsgPreferencesAndSettings"/> before the client joins the lobby.
-    /// Receives <see cref="MsgSelectCharacter"/> and <see cref="MsgUpdateCharacter"/> at any time.
+    /// Receives <see cref="MsgSelectCharacter"/>, <see cref="MsgUpdateCharacter"/>, and
+    /// <see cref="MsgSelectHighestPrioJob"/> at any time.
     /// </summary>
     public sealed class ServerPreferencesManager : IServerPreferencesManager, IPostInjectInit
     {
@@ -41,6 +42,7 @@ namespace Content.Server.Preferences.Managers
             _netManager.RegisterNetMessage<MsgSelectCharacter>(HandleSelectCharacterMessage);
             _netManager.RegisterNetMessage<MsgUpdateCharacter>(HandleUpdateCharacterMessage);
             _netManager.RegisterNetMessage<MsgDeleteCharacter>(HandleDeleteCharacterMessage);
+            _netManager.RegisterNetMessage<MsgSelectHighestPrioJob>(HandleHighestPrioJobMessage);
             _sawmill = _log.GetSawmill("prefs");
         }
 
@@ -163,6 +165,32 @@ namespace Content.Server.Preferences.Managers
                 {
                     await _db.SaveCharacterSlotAsync(userId, null, slot);
                 }
+            }
+        }
+
+        private async void HandleHighestPrioJobMessage(MsgSelectHighestPrioJob message)
+        {
+            var highestPrioJobID = message.JobID;
+            var userId = message.MsgChannel.UserId;
+
+            if (!_cachedPlayerPrefs.TryGetValue(userId, out var prefsData) || !prefsData.PrefsLoaded)
+            {
+                Logger.WarningS("prefs", $"User {userId} tried to modify preferences before they loaded.");
+                return;
+            }
+
+            var curPrefs = prefsData.Prefs!;
+
+            prefsData.Prefs = new PlayerPreferences(
+                curPrefs.Characters,
+                curPrefs.SelectedCharacterIndex,
+                curPrefs.AdminOOCColor,
+                highestPrioJobID
+            );
+
+            if (ShouldStorePrefs(message.MsgChannel.AuthType))
+            {
+                await _db.SaveHighestPrioJobAsync(userId, highestPrioJobID);
             }
         }
 

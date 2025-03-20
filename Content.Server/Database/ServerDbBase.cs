@@ -178,6 +178,18 @@ namespace Content.Server.Database
 
         }
 
+        public async Task SaveHighestPrioJobAsync(NetUserId userId, string? jobId)
+        {
+            await using var db = await GetDb();
+            var prefs = await db.DbContext
+                .Preference
+                .Include(p => p.Profiles)
+                .SingleAsync(p => p.UserId == userId.UserId);
+            prefs.HighestPriorityJob = jobId;
+
+            await db.DbContext.SaveChangesAsync();
+        }
+
         private static async Task SetSelectedCharacterSlotAsync(NetUserId userId, int newSlot, ServerDbContext db)
         {
             var prefs = await db.Preference.SingleAsync(p => p.UserId == userId.UserId);

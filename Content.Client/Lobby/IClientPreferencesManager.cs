@@ -1,4 +1,5 @@
 using Content.Shared.Preferences;
+using Content.Shared.Roles;
 
 namespace Content.Client.Lobby
 {
@@ -17,5 +18,6 @@ namespace Content.Client.Lobby
         void CreateCharacter(ICharacterProfile profile);
         void DeleteCharacter(ICharacterProfile profile);
         void DeleteCharacter(int slot);
+        void SelectHighestPrioJob(string? jobId);
     }
 }

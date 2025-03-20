@@ -23,6 +23,7 @@ namespace Content.Shared.Preferences
             _characters = new Dictionary<int, ICharacterProfile>(characters);
             SelectedCharacterIndex = selectedCharacterIndex;
             AdminOOCColor = adminOOCColor;
+            HighestPriorityJob = highestPriorityJob;
         }
 
         /// <summary>
