@@ -34,13 +34,8 @@
             </PanelContainer>
             <BoxContainer Orientation="Horizontal" VerticalExpand="True" SeparationOverride="0">
                 <BoxContainer Orientation="Vertical">
-                    <BoxContainer Orientation="Horizontal">
-                        <Label Text="{Loc 'character-setup-gui-highest-priority-job-label'}"
-                               HorizontalExpand="True"/>
-                        <Control SetSize="21 21">
-                            <TextureButton Name="HighestPrioJobHelpButton" StyleClasses="HelpButton"/>
-                        </Control>
-                    </BoxContainer>
+                    <Label Text="{Loc 'character-setup-gui-highest-priority-job-label'}"
+                            HorizontalExpand="True"/>
                     <OptionButton Name="HighestPrioJobButton"/>
                     <PanelContainer>
                         <PanelContainer.PanelOverride>
