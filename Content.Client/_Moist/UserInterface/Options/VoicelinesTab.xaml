@@ -1,0 +1,22 @@
+<moistcontrols:VoicelinesTab
+    xmlns="https://spacestation14.io"
+    xmlns:controls="clr-namespace:Content.Client.UserInterface.Controls"
+    xmlns:moistcontrols="clr-namespace:Content.Client._Moist.UserInterface.Options"
+    xmlns:s="clr-namespace:Content.Client.Stylesheets"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="clr-namespace:Content.Client.Options.UI">
+    <BoxContainer Orientation="Vertical">
+        <ScrollContainer VerticalExpand="True">
+            <BoxContainer Orientation="Vertical" Margin="8 8 8 8" VerticalExpand="True">
+                <CheckBox Name="PlaySelfSpeech" Text="{Loc 'moist-ui-audio-self-play-speech'}" Margin="0 0 0 5" />
+                <CheckBox Name="PlaySelfEmotes" Text="{Loc 'moist-ui-audio-self-play-emotes'}" Margin="0 0 0 5" />
+                <controls:TableContainer Name="SpeechEmotesTable" Columns="3" HorizontalExpand="True">
+                    <Label Text="{Loc 'moist-ui-audio-mob'}" />
+                    <Label Text="{Loc 'moist-ui-audio-mob-play-speech'}" />
+                    <Label Text="{Loc 'moist-ui-audio-mob-play-emotes'}" />
+                </controls:TableContainer>
+            </BoxContainer>
+        </ScrollContainer>
+        <ui:OptionsTabControlRow Name="Control" Access="Public" />
+    </BoxContainer>
+</moistcontrols:VoicelinesTab>
